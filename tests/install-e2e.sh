@@ -75,7 +75,8 @@ docker exec "${container_name}" bash -lc '
   mkdir -p /etc/sing-box/conf /var/lib/hyfleet-agent-ops
   printf "%s\n" "{\"log\":{\"level\":\"info\"}}" > /etc/sing-box/conf/00_log.json
   printf "%s\n" "{\"inbounds\":[{\"type\":\"hysteria2\"}]}" > /etc/sing-box/conf/12_hysteria2_inbounds.json
-  cat > /etc/hyfleet/ops-test.yaml <<EOF
+  groupadd --system hyfleet-agent
+  cat > /etc/hyfleet/agent.yaml <<EOF
 server_url: https://panel.example.com
 node_name: e2e-sing-box
 adapter_type: standalone_sing_box
@@ -89,7 +90,21 @@ heartbeat_every: 15s
 telemetry_every: 60s
 desired_every: 10s
 EOF
-  result="$(printf "%s" "{\"operation\":{\"id\":\"8bf7ac09-4750-481b-a007-5c2296373fd4\",\"sequence\":1,\"type\":\"backup_config\",\"attempt\":1}}" | bin/hyfleet-agent-ops -config /etc/hyfleet/ops-test.yaml)"
+  request="{\"operation\":{\"id\":\"8bf7ac09-4750-481b-a007-5c2296373fd4\",\"sequence\":1,\"type\":\"backup_config\",\"attempt\":1}}"
+  if printf "%s" "${request}" | bin/hyfleet-agent-ops -config /etc/hyfleet/agent.yaml \
+    >/tmp/direct-helper.out 2>/tmp/direct-helper.err; then
+    printf "Operations helper unexpectedly accepted a non-socket stdin.\n" >&2
+    exit 1
+  fi
+  grep -q "operations helper socket input" /tmp/direct-helper.err
+  install -m 0755 bin/hyfleet-agent-ops /usr/local/libexec/hyfleet-agent-ops
+  install -m 0644 deploy/systemd/hyfleet-agent-ops.socket /etc/systemd/system/hyfleet-agent-ops.socket
+  install -m 0644 deploy/systemd/hyfleet-agent-ops@.service /etc/systemd/system/hyfleet-agent-ops@.service
+  systemctl daemon-reload
+  systemctl enable --now hyfleet-agent-ops.socket
+  systemctl is-active --quiet hyfleet-agent-ops.socket
+  [[ -S /run/hyfleet-agent-ops.sock ]]
+  result="$(printf "%s" "${request}" | socat -t 10 - UNIX-CONNECT:/run/hyfleet-agent-ops.sock)"
   grep -q "\"status\":\"succeeded\"" <<<"${result}" || {
     printf "Agent configuration backup failed: %s\n" "${result}" >&2
     exit 1

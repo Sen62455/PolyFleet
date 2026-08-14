@@ -5,7 +5,7 @@ ENV container=docker
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates coreutils curl dbus openssl passwd systemd systemd-sysv tar util-linux && \
+      ca-certificates coreutils curl dbus openssl passwd socat systemd systemd-sysv tar util-linux && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     systemctl mask \
