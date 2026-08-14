@@ -62,14 +62,34 @@ curl --fail https://panel.example.com/healthz
 ## 合并另一套测试控制面
 
 不同 Server 实例使用不同 master key。另一实例数据库中的节点凭据、用户凭据与订阅凭据
-不能通过 SQL 直接复制。推荐做法是：
+不能通过 SQL 直接复制。Reality 节点还需要处理两份仅存在节点本地的 root-only 状态：
+
+- `reality-hyfleet-sing-box-reality.json` 中的密钥身份绑定原控制面的节点 ID；
+- `reality-hyfleet-sing-box-reality-applied.json` 中的已应用状态同时绑定节点 ID、原控制面的
+  desired version 和快照哈希。
+
+因此不能把这两份文件原样带到新节点记录。否则 helper 会以
+`reality_node_mismatch`、`reality_identity_failed` 或 `reality_version_conflict` 拒绝应用；
+这些检查是防止跨节点复用私钥或旧快照的安全边界，不应关闭。推荐做法是：
 
 1. 在生产 PolyFleet 重新创建节点、用户和订阅 Token；
-2. 为节点生成新的注册令牌；
-3. 在测试节点备份本地 Agent state 和 Reality identity；
-4. 清除旧的 Server 注册身份，仅让 Agent 使用新令牌注册生产 Server；
-5. 保留本地 Reality identity，等待生产 Server 生成并应用新的受管用户快照；
-6. 新订阅验证成功后再停止测试 Server。
+2. 记录生产节点的新节点 ID，并为它生成新的注册令牌；
+3. 停止测试节点 Agent，把 Agent state、Reality identity 和 Reality applied state 备份到
+   root-only 目录并异地保存；备份和迁移过程都不要输出文件正文；
+4. 切换 Server URL，清除旧控制面的 Agent 注册身份，并仅使用新令牌注册生产 Server；
+5. 在首次同步生产快照前，根据是否必须保留现有客户端密钥选择下面一条路径；
+6. 启动 Agent，等待生产面板显示 Agent 在线、desired/applied version 一致、Reality
+   key generation 一致且用户分配均已应用；
+7. 用新控制面生成的订阅完成外部连接、双向流量和在线状态测试后，再停止测试 Server。
+
+允许客户端刷新密钥时，备份后删除旧 identity 和旧 applied state。下一次应用会为生产
+节点生成全新的 Reality 身份；旧订阅必须刷新。
+
+必须保持原公钥和 Short ID 时，只能使用经过审阅、基于 JSON parser 的一次性迁移工具，
+把 identity 中的 `node_id` 原子地改为生产节点 ID，其他字段一字不改，并保持
+`root:root 0600`。随后必须删除旧 applied state，让生产控制面用自己的版本和快照哈希
+重新建立它。不要用 `sed` 修改 JSON，不要复制旧 applied state，也不要在日志或终端打印
+Reality 私钥。完成后应删除一次性迁移工具。
 
 测试流量历史通常不值得跨主密钥导入。若业务必须保留旧 UUID 或订阅，应编写一次性
 受审计导入工具，用旧 master key 解密后再用新 master key 加密，不能复制密文字段。
