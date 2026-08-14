@@ -72,7 +72,8 @@ docker exec "${container_name}" bash -lc '
   set -Eeuo pipefail
   cd /opt/hyfleet
   grep -qx "ProtectProc=default" deploy/systemd/hyfleet-agent.service
-  mkdir -p /etc/sing-box/conf /var/lib/hyfleet-agent-ops
+  mkdir -p /etc/sing-box/conf
+  install -d -m 0700 /var/lib/hyfleet-agent-ops /var/lib/hyfleet-backups
   printf "%s\n" "{\"log\":{\"level\":\"info\"}}" > /etc/sing-box/conf/00_log.json
   printf "%s\n" "{\"inbounds\":[{\"type\":\"hysteria2\"}]}" > /etc/sing-box/conf/12_hysteria2_inbounds.json
   groupadd --system hyfleet-agent
