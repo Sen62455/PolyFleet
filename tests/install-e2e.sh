@@ -97,6 +97,7 @@ EOF
     exit 1
   fi
   grep -q "operations helper socket input" /tmp/direct-helper.err
+  install -d -m 0755 /usr/local/libexec
   install -m 0755 bin/hyfleet-agent-ops /usr/local/libexec/hyfleet-agent-ops
   install -m 0644 deploy/systemd/hyfleet-agent-ops.socket /etc/systemd/system/hyfleet-agent-ops.socket
   install -m 0644 deploy/systemd/hyfleet-agent-ops@.service /etc/systemd/system/hyfleet-agent-ops@.service
