@@ -1,6 +1,6 @@
 [Unit]
-Description=HyFleet restricted node operation
-Documentation=https://github.com/Sen62455/HyFleet
+Description=PolyFleet restricted node operation
+Documentation=https://github.com/Sen62455/PolyFleet
 
 [Service]
 Type=exec

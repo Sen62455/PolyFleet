@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/store"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -146,7 +146,7 @@ func defaultClashRules() []string {
 		"IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
 		"IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
 		"GEOIP,CN,DIRECT",
-		"MATCH,HyFleet",
+		"MATCH,PolyFleet",
 	}
 }
 
@@ -203,7 +203,7 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 		body, err := yaml.Marshal(clashSubscription{
 			Proxies: proxies,
 			ProxyGroups: []clashProxyGroup{{
-				Name: "HyFleet", Type: "select", Proxies: proxyNames,
+				Name: "PolyFleet", Type: "select", Proxies: proxyNames,
 			}},
 			Rules: defaultClashRules(),
 		})

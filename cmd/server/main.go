@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hyfleet/hyfleet/internal/buildinfo"
-	"github.com/hyfleet/hyfleet/internal/config"
-	"github.com/hyfleet/hyfleet/internal/cryptoutil"
-	"github.com/hyfleet/hyfleet/internal/server"
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/buildinfo"
+	"github.com/Sen62455/PolyFleet/internal/config"
+	"github.com/Sen62455/PolyFleet/internal/cryptoutil"
+	"github.com/Sen62455/PolyFleet/internal/server"
+	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
 func main() {
@@ -108,7 +108,7 @@ func main() {
 			logger.Error("HTTP shutdown failed", "error", err)
 		}
 	}()
-	logger.Info("HyFleet server listening", "address", cfg.Listen, "version", buildinfo.Version)
+	logger.Info("PolyFleet server listening", "address", cfg.Listen, "version", buildinfo.Version)
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("HTTP server stopped", "error", err)
 		os.Exit(1)

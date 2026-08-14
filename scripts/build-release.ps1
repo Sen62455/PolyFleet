@@ -4,7 +4,7 @@ param(
     [string]$Architecture = "amd64",
 
     [ValidatePattern("^[0-9A-Za-z][0-9A-Za-z._-]*$")]
-    [string]$Version = "v1.2.0"
+    [string]$Version = "v1.3.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $releaseRoot = Join-Path (Join-Path $repositoryRoot "output") "releases"
-$packageName = "hyfleet-$Version-linux-$Architecture"
+$packageName = "polyfleet-$Version-linux-$Architecture"
 $bundlePath = Join-Path $releaseRoot $packageName
 $archivePath = Join-Path $releaseRoot "$packageName.tar.gz"
 $archiveChecksumPath = "$archivePath.sha256"
@@ -63,9 +63,9 @@ if ($LASTEXITCODE -eq 0 -and $resolvedCommit) {
 }
 $buildDate = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
 $ldflags = "-s -w " +
-    "-X github.com/hyfleet/hyfleet/internal/buildinfo.Version=$Version " +
-    "-X github.com/hyfleet/hyfleet/internal/buildinfo.Commit=$commit " +
-    "-X github.com/hyfleet/hyfleet/internal/buildinfo.Date=$buildDate"
+    "-X github.com/Sen62455/PolyFleet/internal/buildinfo.Version=$Version " +
+    "-X github.com/Sen62455/PolyFleet/internal/buildinfo.Commit=$commit " +
+    "-X github.com/Sen62455/PolyFleet/internal/buildinfo.Date=$buildDate"
 
 Push-Location (Join-Path $repositoryRoot "web")
 try {
@@ -200,6 +200,8 @@ foreach ($documentName in @(
     "16-phase-7-public-release.md",
     "17-native-convergence-and-monitoring.md",
     "compatibility.md",
+    "quick-start.zh-CN.md",
+    "migration-from-hyfleet.zh-CN.md",
     "vless-reality-lab-runbook.zh-CN.md",
     "inventory.example.yaml",
     (Join-Path "adr" "README.md"),

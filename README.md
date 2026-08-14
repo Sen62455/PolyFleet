@@ -1,37 +1,41 @@
-# HyFleet
+# PolyFleet
 
-[![CI](https://github.com/Sen62455/HyFleet/actions/workflows/ci.yml/badge.svg)](https://github.com/Sen62455/HyFleet/actions/workflows/ci.yml)
-[![Release](https://github.com/Sen62455/HyFleet/actions/workflows/release.yml/badge.svg)](https://github.com/Sen62455/HyFleet/actions/workflows/release.yml)
+[![CI](https://github.com/Sen62455/PolyFleet/actions/workflows/ci.yml/badge.svg)](https://github.com/Sen62455/PolyFleet/actions/workflows/ci.yml)
+[![Release](https://github.com/Sen62455/PolyFleet/actions/workflows/release.yml/badge.svg)](https://github.com/Sen62455/PolyFleet/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-HyFleet is a lightweight, self-hosted control plane for small fleets of
-Hysteria2 VPS nodes. It centralizes users, node assignments, traffic, unified
-subscriptions, host monitoring, alerts, and bounded operations while keeping the
-proxy data plane independent from the controller.
+PolyFleet is a lightweight, self-hosted control plane for small multi-protocol
+proxy fleets. It centralizes users, node assignments, traffic, subscriptions,
+host monitoring, alerts, and bounded operations while keeping each proxy data
+plane independent from the controller.
 
-HyFleet is designed for personal and small shared fleets running on low-resource
-servers. The production stack is a Go Server, an embedded Vue console, SQLite,
-and one small outbound-only Agent per node. Redis, PostgreSQL, Kubernetes, and a
-message broker are not required.
+PolyFleet is intended for personal and small shared fleets on low-resource VPS
+hosts. The stack is a Go Server, an embedded Vue console, SQLite, and one small
+outbound-only Agent per node. Redis, PostgreSQL, Kubernetes, and a message broker
+are not required.
+
+For a guided Chinese installation, start with the
+[Chinese beginner guide](docs/quick-start.zh-CN.md). Existing HyFleet operators
+should read the [in-place migration guide](docs/migration-from-hyfleet.zh-CN.md).
 
 ## Highlights
 
 - Manage global users, expiry, enable state, node assignments, independent
   per-node credentials, and global or per-node traffic limits.
-- Authenticate native Hysteria2 users through an Agent-side verifier cache, so a
-  temporary controller outage does not interrupt cached authentication.
-- Generate rotatable and revocable subscription URLs in Hysteria2 URI, Base64,
-  Mihomo/Clash, and sing-box formats.
-- Account for upload and download with a durable Agent Outbox and idempotent
-  controller aggregation.
-- Observe online users, host resources, core status, bounded top-process and
-  systemd-service snapshots, alerts, and retained metric history.
+- Fully manage native Hysteria2 and the pinned VLESS/TCP/Reality sing-box
+  profile through typed adapters instead of arbitrary configuration injection.
+- Generate rotatable and revocable subscriptions in URI, Base64, Mihomo/Clash,
+  and sing-box formats.
+- Account for upload and download through a durable Agent Outbox and idempotent
+  controller aggregation. Traffic quotas count both directions.
+- Observe online users and connections, disconnect a selected user, monitor host
+  resources and core state, and retain bounded metric history.
+- Track a manually configured monthly traffic allowance for each node, including
+  reset day and provider-console calibration when no provider API is available.
 - Run allowlisted core probes, restarts, limited log reads, and bounded local
   configuration backups without exposing a remote shell.
 - Reconcile desired state asynchronously and surface pending, applied, failed,
   stale, and offline states explicitly.
-- Install natively on Debian or Ubuntu, or run only the Server in a hardened
-  rootless container. Agents remain native systemd services.
 - Build checksum-verified amd64/arm64 releases with SPDX SBOMs and keyless
   Sigstore signatures.
 
@@ -39,66 +43,64 @@ message broker are not required.
 
 ```mermaid
 flowchart LR
-    Admin[Administrator browser] -->|HTTPS| Server[HyFleet Server]
+    Admin[Administrator browser] -->|HTTPS| Server[PolyFleet Server]
     Client[Subscription client] -->|HTTPS| Server
     Server --> DB[(SQLite WAL)]
-    AgentA[HyFleet Agent] -->|HTTPS poll and report| Server
-    AgentB[HyFleet Agent] -->|HTTPS poll and report| Server
-    AgentA -->|loopback auth and stats| HY2A[Hysteria2]
-    AgentB -->|loopback auth and stats| HY2B[Hysteria2]
+    AgentA[PolyFleet Agent] -->|HTTPS poll and report| Server
+    AgentB[PolyFleet Agent] -->|HTTPS poll and report| Server
+    AgentA -->|loopback auth and stats| HY2[Hysteria2]
+    AgentB -->|fixed local API| Reality[sing-box VLESS Reality]
     AgentA -->|fixed local protocol| Helper[Root operations helper]
+    AgentB -->|fixed local protocol| Helper
 ```
 
-The Server records desired state and never opens an inbound management port on a
-node. Each Agent initiates HTTPS requests, applies only a newer revision, keeps
-its last valid authentication snapshot locally, and queues traffic or operation
-results until the Server acknowledges them.
-
-See the [Chinese project overview](docs/project-overview.zh-CN.md) for the
-requirements, technology choices, trust boundaries, data flows, and operational
-model.
+The Server never opens an inbound management port on a node. Each Agent initiates
+HTTPS requests, applies only newer typed desired state, keeps its last valid local
+state, and queues traffic or operation results until the Server acknowledges
+them. A controller outage therefore does not become a proxy data-plane outage.
 
 ## Adapter support
 
-| Adapter | Users | Traffic and subscriptions | Operations | Recommended use |
-| --- | --- | --- | --- | --- |
-| Native Hysteria2 | Fully managed | Fully managed | Supported | New nodes and migrated nodes |
-| S-UI v1.5.x | Explicit import and adoption | Managed after adoption | Limited | Migration compatibility |
-| Standalone sing-box | Observation only | Not managed | Supported | Temporary migration inventory |
+| Adapter | Management level | Users and traffic | Intended use |
+| --- | --- | --- | --- |
+| Native Hysteria2 | Managed | Users, subscriptions, bidirectional traffic, online state and kick | New or migrated Hysteria2 nodes |
+| VLESS/TCP/Reality | Managed pinned profile | Users, subscriptions, bidirectional traffic, active connections and kick | Clean dedicated Reality nodes |
+| S-UI v1.5.x | Compatibility/import | Managed only after explicit adoption | Migration from an existing S-UI node |
+| Standalone sing-box | Observation only | No user or subscription ownership | Temporary inventory and monitoring |
 
-Native Hysteria2 is the preferred steady-state deployment. Compatibility
-adapters do not silently adopt or rewrite existing resources. Refer to the
-[compatibility matrix](docs/compatibility.md) before onboarding a node.
+PolyFleet does not silently adopt or rewrite resources that it does not own.
+The Reality adapter intentionally manages one audited profile: VLESS over direct
+TCP, Reality, and `xtls-rprx-vision`. It is not an arbitrary sing-box JSON panel.
+See the [compatibility matrix](docs/compatibility.md) before onboarding a node.
 
 ## Requirements
 
-- HyFleet Server: Debian 12/13 or Ubuntu 24.04 with systemd, on `amd64` or
-  `arm64`; Docker Engine with Compose v2 is also supported for the Server only.
-- HyFleet Agent: Debian 12/13 or Ubuntu 24.04 with systemd, on `amd64` or
-  `arm64`.
+- Server and Agent: Debian 12/13 or Ubuntu 24.04 with systemd, `amd64` or
+  `arm64`. Docker Engine with Compose v2 is supported for the Server only.
 - A dedicated HTTPS origin for the control plane. Native installation binds the
   Server to loopback and expects a reverse proxy such as Caddy or Nginx.
 - Outbound HTTPS connectivity from every Agent to the Server.
-- An existing, independently working proxy core on each node.
+- Native Hysteria2 requires an independently working Hysteria2 core. A clean
+  Reality Agent installation uses the pinned sing-box binary in the release.
 
-## Install
+## Quick install
 
-Choose a reviewed release tag and download the bootstrap from that same tag. The
-following public-repository workflow intentionally keeps the version explicit:
+Choose a reviewed release tag and fetch the bootstrap from that same immutable
+tag:
 
 ```bash
-VERSION='vX.Y.Z'
+VERSION='v1.3.0'
 curl --fail --location --proto '=https' --tlsv1.2 \
   -o install.sh \
-  "https://raw.githubusercontent.com/Sen62455/HyFleet/${VERSION}/install.sh"
+  "https://raw.githubusercontent.com/Sen62455/PolyFleet/${VERSION}/install.sh"
 less install.sh
 sudo bash install.sh server \
   --version "${VERSION}" \
   --public-url https://panel.example.com
 ```
 
-Complete administrator setup through the HTTPS origin, create a node and its
-one-time enrollment Token, then run the same bootstrap on that node:
+After configuring HTTPS and creating the first administrator, create a node and
+its one-time enrollment token in the console. Run the same bootstrap on the node:
 
 ```bash
 sudo bash install.sh agent \
@@ -109,37 +111,19 @@ sudo bash install.sh agent \
   --core-config-path /etc/hysteria/config.yaml
 ```
 
-Enrollment is interactive so the Token is not placed in shell history. The
-bootstrap verifies the external SHA-256 file, every packaged file, the host OS,
-and the binary architecture before invoking the native installer.
-
-For a private repository, download releases on an authenticated workstation with
-GitHub CLI and upload the verified bundle, or use the fleet updater for an
-existing installation. Do not place a GitHub Token on every VPS. Read the
-[project overview](docs/project-overview.zh-CN.md) and the
-[native cutover runbook](docs/native-cutover-runbook.zh-CN.md) before a
-production install, migration, upgrade, or restore.
-
-## Containerized Server
-
-Only the Server is containerized. Configure `docker/.env.example`, then use
-[`docker/compose.yaml`](docker/compose.yaml). The image runs as UID/GID 10001,
-drops Linux capabilities, uses a read-only root filesystem, and publishes port
-8080 on host loopback by default. Do not mount the Docker socket or host `/etc`
-into the container.
+Enrollment is interactive so the token is not written to shell history. The
+bootstrap verifies the external SHA-256 file, all packaged files, host OS, and
+binary architecture before invoking the native installer.
 
 ## Upgrade, backup, and restore
 
-An existing small fleet can be upgraded in parallel from an authenticated
-Windows workstation:
+Server upgrades must precede Agent upgrades. The updater verifies both checksum
+layers, saves a rollback snapshot, performs component health checks, and restores
+the previous component on failure:
 
 ```powershell
-.\scripts\deploy-fleet.ps1 -Version vX.Y.Z
+.\scripts\deploy-fleet.ps1 -Version v1.3.0
 ```
-
-The updater verifies both checksum layers, saves component snapshots, performs
-health checks, and restores the previous component when an update fails. Server
-upgrades must precede Agent upgrades.
 
 Create a consistent native Server backup with:
 
@@ -148,8 +132,23 @@ sudo bash deploy/backup-server.sh --output-dir /var/backups/hyfleet
 ```
 
 The database archive and encryption master key are separate recovery artifacts.
-Store both in separate, encrypted off-host locations and run restore drills; a
-database without its matching master key cannot recover managed credentials.
+Both are required to recover managed credentials. Store them in separate,
+encrypted off-host locations and test restoration.
+
+## Compatibility with HyFleet
+
+PolyFleet `v1.3.0` is an in-place successor to HyFleet `v1.2.x`. To avoid a risky
+flag-day migration it deliberately retains these compatibility interfaces:
+
+- `hyfleet-server`, `hyfleet-agent`, `hyfleet-agent-ops` and existing systemd
+  unit names;
+- `/etc/hyfleet`, `/var/lib/hyfleet*`, `HYFLEET_*`, and `X-HyFleet-*`;
+- the local Reality API path and pinned sing-box compatibility version suffix.
+
+These names are runtime ABI, not the product brand. They allow an existing
+database, master key, Agent identity, authentication cache, and rollback snapshot
+to continue working unchanged. New public release assets use `polyfleet-*`, and
+the Server container is `ghcr.io/sen62455/polyfleet`.
 
 ## Development
 
@@ -166,40 +165,26 @@ pnpm --dir web lint:docs
 pnpm --dir web build
 ```
 
-Build a Linux release bundle from Windows:
+Build release bundles with:
 
 ```powershell
-.\scripts\build-release.ps1 -Architecture amd64 -Version vX.Y.Z
+.\scripts\build-release.ps1 -Architecture amd64 -Version v1.3.0
 ```
 
-Release assets are written to `output/releases/`. Do not deploy a Windows
-preview binary to a VPS. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution
-and compatibility expectations.
+## Security and scope
 
-## Security
+PolyFleet does not provide arbitrary command execution, a browser terminal, SSH
+key custody, or general-purpose remote management. The Agent runs unprivileged;
+its root helper accepts only a fixed local protocol for allowlisted operations.
 
-HyFleet deliberately does not provide arbitrary command execution, a browser
-terminal, SSH key custody, or a general-purpose remote management surface. The
-Agent uses a dedicated unprivileged account; its root helper accepts only a fixed
-local protocol for allowlisted operations.
+PolyFleet remains a small-fleet control plane, not a commercial billing platform
+or a universal proxy panel. Multi-administrator RBAC, payments, VPS purchasing,
+full OS patch management, HA controllers, arbitrary core configuration, and
+unreviewed protocol profiles remain outside the current scope. New protocols
+must enter through a typed adapter with explicit ownership and security bounds.
 
-Never commit or publish real node addresses, credentials, subscription URLs,
-enrollment Tokens, API Tokens, private keys, database files, or unredacted
-configurations. Report vulnerabilities through GitHub private vulnerability
-reporting as described in [SECURITY.md](SECURITY.md).
-
-## Documentation
-
-Start with the [documentation index](docs/README.md). It separates current
-operator and architecture references from historical implementation records.
-
-## Scope
-
-HyFleet targets small self-hosted fleets, not a commercial billing platform or a
-general-purpose RMM. Multi-administrator RBAC, payments, VPS purchasing, full OS
-patch management, HA controllers, and protocols other than Hysteria2 are outside
-the current scope.
-
-## License
+Never publish real node addresses, credentials, subscription URLs, enrollment
+tokens, private keys, databases, master keys, or unredacted configurations.
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 Licensed under the [Apache License 2.0](LICENSE).

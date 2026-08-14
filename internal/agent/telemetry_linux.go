@@ -17,7 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/hyfleet/hyfleet/internal/protocol"
+	"github.com/Sen62455/PolyFleet/internal/protocol"
 )
 
 const linuxClockTicks = 100

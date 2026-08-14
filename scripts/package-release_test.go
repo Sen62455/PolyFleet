@@ -30,7 +30,7 @@ func TestPackageReleaseUsesPortableModes(t *testing.T) {
 		}
 	}
 	archivePath := filepath.Join(root, "release.tar.gz")
-	if err := packageRelease(source, archivePath, "hyfleet-v1.0.0-linux-amd64"); err != nil {
+	if err := packageRelease(source, archivePath, "polyfleet-v1.0.0-linux-amd64"); err != nil {
 		t.Fatalf("packageRelease() error = %v", err)
 	}
 
@@ -45,12 +45,12 @@ func TestPackageReleaseUsesPortableModes(t *testing.T) {
 	}
 	defer gzipReader.Close()
 	targetModes := map[string]int64{
-		"hyfleet-v1.0.0-linux-amd64/":                   0o755,
-		"hyfleet-v1.0.0-linux-amd64/bin/":               0o755,
-		"hyfleet-v1.0.0-linux-amd64/bin/hyfleet-server": 0o755,
-		"hyfleet-v1.0.0-linux-amd64/deploy/install.sh":  0o755,
-		"hyfleet-v1.0.0-linux-amd64/docs/README.md":     0o644,
-		"hyfleet-v1.0.0-linux-amd64/SHA256SUMS":         0o644,
+		"polyfleet-v1.0.0-linux-amd64/":                   0o755,
+		"polyfleet-v1.0.0-linux-amd64/bin/":               0o755,
+		"polyfleet-v1.0.0-linux-amd64/bin/hyfleet-server": 0o755,
+		"polyfleet-v1.0.0-linux-amd64/deploy/install.sh":  0o755,
+		"polyfleet-v1.0.0-linux-amd64/docs/README.md":     0o644,
+		"polyfleet-v1.0.0-linux-amd64/SHA256SUMS":         0o644,
 	}
 	seen := make(map[string]bool, len(targetModes))
 	tarReader := tar.NewReader(gzipReader)
@@ -88,7 +88,7 @@ func TestPackageReleaseRejectsUnsafeNames(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(source, "unsafe name"), []byte("x"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	if err := packageRelease(source, filepath.Join(root, "release.tar.gz"), "hyfleet-v1.0.0"); err == nil {
+	if err := packageRelease(source, filepath.Join(root, "release.tar.gz"), "polyfleet-v1.0.0"); err == nil {
 		t.Fatal("packageRelease() accepted an unsafe archive path")
 	}
 }

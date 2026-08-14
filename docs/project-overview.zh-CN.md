@@ -1,6 +1,6 @@
-# HyFleet 项目概览
+# PolyFleet 项目概览
 
-本文面向准备部署、维护或参与开发 HyFleet 的读者。它从实际问题出发，说明当前需求、
+本文面向准备部署、维护或参与开发 PolyFleet 的读者。它从实际问题出发，说明当前需求、
 技术选型、架构边界、主要数据流、部署运维方式和发布质量门槛。具体版本的兼容范围仍以
 [兼容性矩阵](compatibility.md)和 Release 说明为准。
 
@@ -10,10 +10,10 @@
 用户密码、到期时间、节点分配、流量、在线状态、订阅和服务健康分散在多个入口。控制面
 越多，迁移、备份和故障定位也越难。
 
-HyFleet 提供一个小型自托管控制面，并在每台节点部署出站连接的 Agent。它统一管理原生
-Hysteria2 用户和订阅，采集主机与代理核心状态，执行有限的运维操作，同时保留代理数据面
-的独立性。控制面短暂不可用时，已经运行的 Hysteria2 仍可传输流量，Agent 也能使用最后
-一次有效缓存继续鉴权，并在恢复连接后补发结果。
+PolyFleet 提供一个小型自托管控制面，并在每台节点部署出站连接的 Agent。它通过带类型的
+适配器管理原生 Hysteria2 和固定 VLESS/TCP/Reality 配置，采集主机与代理核心状态，执行
+有限运维，同时保留代理数据面的独立性。控制面短暂不可用时，已经应用的配置仍可传输
+流量；Agent 在恢复连接后继续收敛并补发结果。
 
 ## 2. 目标、约束与非目标
 
@@ -23,7 +23,10 @@ Hysteria2 用户和订阅，采集主机与代理核心状态，执行有限的�
 - 创建全局用户，管理启用状态、到期时间、节点分配和全局或单节点额度。
 - 每个“用户 - 节点”分配使用独立凭据，并支持明确的单项或整组轮换。
 - 在原生 Hysteria2 节点提供 HTTP 鉴权、本地缓存、流量统计、在线状态和踢下线。
-- 输出 Hysteria2 URI、Base64、Mihomo/Clash 和 sing-box 统一订阅。
+- 在专用干净节点管理固定 VLESS/TCP/Reality sing-box 配置、用户、双向流量、在线连接和
+  定向断开。
+- 输出 Hysteria2/VLESS URI、Base64、Mihomo/Clash 和 sing-box 统一订阅。
+- 记录每台节点的手工双向月流量额度、重置日、服务商控制台校准值和分级告警。
 - 采集主机资源、代理核心、主要进程和 systemd 服务快照，保留受限的历史指标。
 - 提供核心探测、重启、有限日志和本地配置备份，记录结果并产生告警。
 - 节点离线或控制面暂时断开后，自动追平期望状态、流量批次和运维结果。
@@ -35,7 +38,7 @@ Hysteria2 用户和订阅，采集主机与代理核心状态，执行有限的�
 - 用户变更采用期望状态和最终一致性；界面必须区分待同步、已应用、失败和离线。
 - 流量批次和运维结果可重试且幂等，不能因网络重传重复记账或重复执行。
 - 指标和列表必须有采样、返回条数和保留时间上限，避免低内存节点被监控本身拖垮。
-- 任何适配器都不能默认修改未被 HyFleet 创建或显式接管的资源。
+- 任何适配器都不能默认修改未被 PolyFleet 创建或显式接管的资源。
 
 ### 当前非目标
 
@@ -43,7 +46,7 @@ Hysteria2 用户和订阅，采集主机与代理核心状态，执行有限的�
 - 通用远程 Shell、网页终端、SSH 密钥托管、文件管理器或完整 RMM。
 - 自动购买 VPS、配置 DNS、操作系统补丁管理或任意 systemd 服务控制。
 - 高可用控制面、数据库集群、Kubernetes 或超大规模节点编排。
-- Hysteria2 之外的代理协议和多管理员细粒度 RBAC。
+- 任意 sing-box JSON、未审核协议配置，以及多管理员细粒度 RBAC。
 
 ## 3. 技术栈与选择理由
 
@@ -59,20 +62,20 @@ Hysteria2 用户和订阅，采集主机与代理核心状态，执行有限的�
 | Server 容器 | Docker Compose，可选 | 为已有容器环境提供入口；Agent 仍需直接访问 systemd 和核心配置 |
 | CI 与发布 | GitHub Actions | 在干净系统测试安装、升级和恢复，并生成校验和、SBOM 与签名 |
 
-SQLite 是有意的范围选择。HyFleet 面向少量节点，短事务、WAL、有限连接池和批量清理可以
+SQLite 是有意的范围选择。PolyFleet 面向少量节点，短事务、WAL、有限连接池和批量清理可以
 提供足够并发；在没有测量依据前，引入 PostgreSQL 或消息队列只会增加故障点和资源占用。
 
 ## 4. 总体架构
 
 ```mermaid
 flowchart TB
-    Browser[管理员浏览器] -->|HTTPS 会话与 CSRF| Server[HyFleet Server]
+    Browser[管理员浏览器] -->|HTTPS 会话与 CSRF| Server[PolyFleet Server]
     Subscriber[订阅客户端] -->|不透明 Token| Server
     Server --> Store[(SQLite WAL)]
     Server --> Scheduler[协调器与保留任务]
     Agent[节点 Agent] -->|注册、心跳、轮询、上报| Server
     Agent --> Cache[(本地 SQLite 与鉴权缓存)]
-    Agent -->|loopback| Core[Hysteria2 或兼容适配器]
+    Agent -->|固定本地接口| Core[Hysteria2 或受管 Reality 核心]
     Agent -->|固定本地协议| Helper[root 运维 helper]
     Helper -->|白名单操作| Systemd[固定核心服务]
 ```
@@ -97,9 +100,10 @@ Agent 使用节点专属凭据主动连接 Server。它缓存最后一次有效�
 
 ### 代理数据面
 
-Hysteria2 或兼容核心独立承载用户流量。HyFleet 不重新实现 QUIC、TLS 或代理协议。原生
-Hysteria2 通过 loopback HTTP 接口调用 Agent 鉴权，并通过 loopback Traffic Stats API
-提供累计流量和在线信息。
+Hysteria2 或受管 sing-box 独立承载用户流量。PolyFleet 不重新实现 QUIC、TLS 或代理
+协议。原生 Hysteria2 通过 loopback HTTP 接口调用 Agent 鉴权，并通过 loopback Traffic
+Stats API 提供累计流量和在线信息。Reality 适配器只接受一个审计过的固定配置和固定本地
+API，不接受管理员上传任意 JSON。
 
 ## 5. 核心领域模型
 
@@ -162,7 +166,8 @@ Outbox 后再上报；helper 还按 operation ID 保存本地结果，避免重�
 | 适配器 | 管理边界 |
 | --- | --- |
 | `native_hysteria2` | 完整用户、鉴权、流量、在线、订阅和有限运维，推荐长期使用 |
-| `s_ui` | 先探测和只读导入，只有显式接管且成功同步的客户端才由 HyFleet 管理 |
+| `sing_box_vless_reality` | 固定 VLESS/TCP/Reality 配置、用户、流量、在线、订阅和定向断开 |
+| `s_ui` | 先探测和只读导入，只有显式接管且成功同步的客户端才由 PolyFleet 管理 |
 | `standalone_sing_box` | 主机与核心观察、重启、有限日志和配置备份；不管理用户或订阅 |
 
 迁移现有节点时应新建临时原生节点记录，在空闲 UDP 端口完成鉴权、订阅、流量、在线和运维
@@ -178,7 +183,7 @@ Agent 以固定间隔采集 CPU、内存、Swap、根分区、磁盘 I/O、网�
 
 进程快照仅上传观察所需的 PID、进程名、CPU、RSS、归属服务和运行时间等字段，不上传
 命令行参数、环境变量或打开的文件，因为其中可能包含密码和 Token。服务面板用于定位
-资源消耗和核心状态，不是通用 systemd 管理器；HyFleet 不因此获得重启任意服务的能力。
+资源消耗和核心状态，不是通用 systemd 管理器；PolyFleet 不因此获得重启任意服务的能力。
 
 为了让非 root Agent 读取其他用户进程的基础计数和 cgroup 归属，原生 systemd 单元使用
 `ProtectProc=default`，不再在 Agent 自己的挂载命名空间内隐藏其他 PID。这是主机进程可见性
@@ -211,20 +216,21 @@ Agent 以固定间隔采集 CPU、内存、Swap、根分区、磁盘 I/O、网�
 - Server 备份归档与 master key 分离。两者都必须复制到加密的异机存储。
 
 root 攻陷仍然意味着该节点完全失陷；Server 与 master key 同时失陷可能影响整个 fleet。
-HyFleet 通过缩小权限和秘密传播范围降低影响，但不能消除主机级入侵风险。
+PolyFleet 通过缩小权限和秘密传播范围降低影响，但不能消除主机级入侵风险。
 
 ## 10. 部署与资源预算
 
 ### 推荐拓扑
 
 - 一台稳定节点运行原生 `hyfleet-server` 和 SQLite，通过 Caddy 或 Nginx 暴露 HTTPS。
-- 每台代理节点运行 `hyfleet-agent`、按需启动的 operations helper 和独立 Hysteria2 核心。
+- 每台代理节点运行 `hyfleet-agent`、按需启动的 operations helper，以及独立 Hysteria2
+  核心或 PolyFleet 固定版本的 Reality sing-box 核心。
 - 控制面与节点可以共机；TCP 443 的 HTTPS 面板和 UDP 443 的 Hysteria2 可以同时使用。
 - Docker 仅适合 Server。Agent 需要本机 systemd、Unix socket 与受限配置路径，不应容器化。
 
 工程预算以 Agent 空闲 RSS 不高于约 30 MiB、Server 空闲 RSS 不高于约 80 MiB 为目标，
 实际值还取决于内核、SQLite 页面缓存、指标数量和节点数。Hysteria2、反向代理和操作系统
-资源不计入 HyFleet 本身。预算是发布门槛，不是未经测量的保证。
+资源不计入 PolyFleet 本身。预算是发布门槛，不是未经测量的保证。
 
 ### 原生安装
 
@@ -319,12 +325,21 @@ SHA-256 只有在校验文件来源可信时才能证明完整性；稳定发布
 
 ## 12. 已知边界与演进方向
 
-- S-UI 和 standalone sing-box 是迁移兼容入口，原生 Hysteria2 才是完整受管路径。
+- 原生 Hysteria2 与固定 VLESS Reality 是完整受管路径；S-UI 和 standalone sing-box 是
+  迁移兼容入口。
 - 告警当前以控制台状态为主；外部邮件、Webhook 或消息平台通知需要独立的秘密和重试设计。
 - 节点本地核心备份没有自动远端归档或统一清理策略。
+- 服务商流量通常没有统一 API；节点月额度依赖管理员录入，并可用控制台当前用量校准。
 - 主机指标用于观察，不提供完整 APM、日志平台或通用进程控制。
 - 扩展到多管理员、客户自助和计费前，需要单独设计 RBAC、审计、租户隔离和合规边界。
 - 节点数或写入量超出 SQLite 预算时，应先做基准和锁竞争测量，再通过 ADR 评估外部数据库。
 
 完整文档入口见[文档索引](README.md)，架构约束的变更应通过新的 ADR 记录，而不是静默
 改写已经接受的历史决策。
+
+## 13. HyFleet 兼容运行时
+
+PolyFleet `v1.3.0` 为了原地升级保留 `hyfleet-server`、`hyfleet-agent`、systemd unit、
+`/etc/hyfleet`、`/var/lib/hyfleet*`、`HYFLEET_*`、`X-HyFleet-*` 和 Reality 本地 API
+路径。这些是兼容 ABI，不是当前产品名。公开源码、Release 资产和容器镜像使用
+PolyFleet；生产部署不应手工重命名兼容路径。

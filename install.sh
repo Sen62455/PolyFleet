@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repository="Sen62455/HyFleet"
-version="v1.2.0"
+repository="Sen62455/PolyFleet"
+version="v1.3.0"
 temporary_dir=""
 max_archive_bytes=$((64 * 1024 * 1024))
 max_checksum_bytes=1024
@@ -11,8 +11,8 @@ max_archive_entries=256
 usage() {
   cat <<'EOF'
 Usage:
-  sudo bash install.sh server [--version v1.2.0] --public-url https://panel.example.com
-  sudo bash install.sh agent [--version v1.2.0] --server-url https://panel.example.com \
+  sudo bash install.sh server [--version v1.3.0] --public-url https://panel.example.com
+  sudo bash install.sh agent [--version v1.3.0] --server-url https://panel.example.com \
     --node-name NODE \
     --adapter native-hysteria2|standalone-sing-box|s-ui|vless-reality [options]
 
@@ -21,9 +21,9 @@ downloads a GitHub Release, verifies both checksum layers, then runs the bundled
 native installer. Agent enrollment remains interactive so its one-time token is
 not written to shell history.
 
-The vless-reality adapter is available only from the experimental branch. It
-requires the pinned HyFleet sing-box 1.13.18-hyfleet-utls1.8.7 build already
-installed as /usr/bin/sing-box. This bootstrap does not download or replace it.
+The vless-reality adapter uses the pinned compatibility sing-box build shipped
+inside the PolyFleet release. The native installer verifies and installs that
+exact build as /usr/bin/sing-box for a clean managed Reality node.
 EOF
 }
 
@@ -97,7 +97,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-package_name="hyfleet-${version}-linux-${architecture}"
+package_name="polyfleet-${version}-linux-${architecture}"
 archive_name="${package_name}.tar.gz"
 checksum_name="${archive_name}.sha256"
 release_url="https://github.com/${repository}/releases/download/${version}"

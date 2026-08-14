@@ -1,5 +1,6 @@
 [Unit]
-Description=HyFleet control plane
+Description=PolyFleet control plane (HyFleet-compatible runtime)
+Documentation=https://github.com/Sen62455/PolyFleet
 After=network-online.target
 Wants=network-online.target
 

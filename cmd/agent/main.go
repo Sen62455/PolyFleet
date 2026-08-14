@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hyfleet/hyfleet/internal/agent"
-	"github.com/hyfleet/hyfleet/internal/buildinfo"
-	"github.com/hyfleet/hyfleet/internal/config"
-	"github.com/hyfleet/hyfleet/internal/hy2migration"
+	"github.com/Sen62455/PolyFleet/internal/agent"
+	"github.com/Sen62455/PolyFleet/internal/buildinfo"
+	"github.com/Sen62455/PolyFleet/internal/config"
+	"github.com/Sen62455/PolyFleet/internal/hy2migration"
 )
 
 func main() {

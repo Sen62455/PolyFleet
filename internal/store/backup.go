@@ -120,7 +120,7 @@ func CheckDatabase(ctx context.Context, path string) error {
 		ctx,
 		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
 	).Scan(&migrationTable); err != nil || migrationTable != "schema_migrations" {
-		return errors.New("database does not contain the HyFleet migration table")
+		return errors.New("database does not contain the PolyFleet/HyFleet migration table")
 	}
 	return nil
 }

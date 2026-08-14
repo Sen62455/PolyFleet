@@ -58,7 +58,7 @@ config_path="/etc/hyfleet/server.yaml"
 database_path="/var/lib/hyfleet/server.db"
 master_key_path="/var/lib/hyfleet/master.key"
 [[ -x "${binary_path}" && -f "${config_path}" && -f "${database_path}" && -f "${master_key_path}" ]] ||
-  fail "HyFleet Server is not installed with the standard filesystem layout"
+  fail "PolyFleet Server is not installed with the compatible filesystem layout"
 [[ ! -L "${config_path}" && ! -L "${database_path}" && ! -L "${master_key_path}" ]] ||
   fail "server backup paths cannot be symbolic links"
 [[ "$(stat -c '%s' "${master_key_path}")" == "32" ]] || fail "master key must contain exactly 32 bytes"

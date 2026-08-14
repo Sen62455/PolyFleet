@@ -52,7 +52,7 @@ func TestSingBoxRealitySupplyChainContract(t *testing.T) {
 	}
 	if !strings.Contains(apiPatch, `if !options.HyFleetOnly {`) ||
 		strings.Contains(apiPatch, "allowedOrigins = nil") {
-		t.Fatal("HyFleet-only API patch does not disable CORS fail closed")
+		t.Fatal("compatibility API patch does not disable CORS fail closed")
 	}
 	for name, content := range map[string]string{
 		"build script": buildScript,

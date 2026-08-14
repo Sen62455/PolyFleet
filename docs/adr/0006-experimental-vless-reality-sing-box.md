@@ -1,12 +1,17 @@
-# ADR 0006: Experimental VLESS Reality Data Plane with sing-box
+# ADR 0006: Typed VLESS Reality Data Plane with sing-box
 
-- Status: Accepted for the experimental branch
+- Status: Superseded by promotion to PolyFleet `v1.3.0`
 - Date: 2026-08-12
 - Scope: `experimental/vless-reality-singbox`; not part of the HyFleet stable
   product contract until the promotion gates in this ADR pass
 - Extends: ADR 0001, ADR 0003, ADR 0004, and ADR 0005
 - Supersedes: only the Hysteria2-only and S-UI-only limitations described below;
   all other security and consistency decisions in those ADRs remain in force
+
+> Historical note: this ADR defined the isolated experiment and its promotion
+> gates. Commit `0bcb1fa` completed the usage, online-state, targeted-disconnect,
+> quota, and node-budget gates. PolyFleet `v1.3.0` promotes that exact typed
+> profile while retaining the security and ownership boundaries below.
 
 ## Context
 

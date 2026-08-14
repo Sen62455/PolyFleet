@@ -43,7 +43,7 @@ func packageRelease(sourcePath, outputPath, archiveRoot string) error {
 	if err := os.MkdirAll(outputDirectory, 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
-	temporary, err := os.CreateTemp(outputDirectory, ".hyfleet-release-*.tar.gz")
+	temporary, err := os.CreateTemp(outputDirectory, ".polyfleet-release-*.tar.gz")
 	if err != nil {
 		return fmt.Errorf("create temporary archive: %w", err)
 	}

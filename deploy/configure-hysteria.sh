@@ -22,7 +22,7 @@ trap 'printf "ERROR: Hysteria integration failed at line %s.\n" "$LINENO" >&2' E
 for command_name in getent install openssl systemctl; do
   command -v "${command_name}" >/dev/null 2>&1 || fail "required command is missing: ${command_name}"
 done
-[[ -x /usr/local/bin/hyfleet-agent ]] || fail "HyFleet Agent is not installed"
+[[ -x /usr/local/bin/hyfleet-agent ]] || fail "PolyFleet Agent is not installed"
 [[ -f "${config_path}" ]] || fail "missing ${config_path}"
 getent group hyfleet-agent >/dev/null 2>&1 || fail "hyfleet-agent group does not exist"
 
@@ -49,4 +49,4 @@ for _ in {1..20}; do
   sleep 1
 done
 systemctl status hyfleet-agent --no-pager --full || true
-fail "HyFleet Agent did not remain active after enabling traffic statistics"
+fail "PolyFleet Agent did not remain active after enabling traffic statistics"

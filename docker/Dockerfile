@@ -18,16 +18,16 @@ COPY cmd ./cmd
 COPY internal ./internal
 COPY --from=web /src/internal/webui/dist ./internal/webui/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -tags webui -trimpath \
-    -ldflags="-s -w -X github.com/hyfleet/hyfleet/internal/buildinfo.Version=${VERSION} -X github.com/hyfleet/hyfleet/internal/buildinfo.Commit=${COMMIT} -X github.com/hyfleet/hyfleet/internal/buildinfo.Date=${BUILD_DATE}" \
+    -ldflags="-s -w -X github.com/Sen62455/PolyFleet/internal/buildinfo.Version=${VERSION} -X github.com/Sen62455/PolyFleet/internal/buildinfo.Commit=${COMMIT} -X github.com/Sen62455/PolyFleet/internal/buildinfo.Date=${BUILD_DATE}" \
     -o /out/hyfleet-server ./cmd/server
 
 FROM alpine:3.23
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
-LABEL org.opencontainers.image.title="HyFleet" \
-      org.opencontainers.image.description="Lightweight Hysteria2 fleet control plane" \
-      org.opencontainers.image.source="https://github.com/Sen62455/HyFleet" \
+LABEL org.opencontainers.image.title="PolyFleet" \
+      org.opencontainers.image.description="Lightweight multi-protocol proxy fleet control plane" \
+      org.opencontainers.image.source="https://github.com/Sen62455/PolyFleet" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}" \

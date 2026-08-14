@@ -2,9 +2,9 @@ VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w \
-	-X github.com/hyfleet/hyfleet/internal/buildinfo.Version=$(VERSION) \
-	-X github.com/hyfleet/hyfleet/internal/buildinfo.Commit=$(COMMIT) \
-	-X github.com/hyfleet/hyfleet/internal/buildinfo.Date=$(BUILD_DATE)
+	-X github.com/Sen62455/PolyFleet/internal/buildinfo.Version=$(VERSION) \
+	-X github.com/Sen62455/PolyFleet/internal/buildinfo.Commit=$(COMMIT) \
+	-X github.com/Sen62455/PolyFleet/internal/buildinfo.Date=$(BUILD_DATE)
 
 .PHONY: test web-test web build release clean
 

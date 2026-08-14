@@ -1,4 +1,4 @@
-# HyFleet listens only on loopback. Terminate TLS in a reverse proxy.
+# PolyFleet listens only on loopback. Terminate TLS in a reverse proxy.
 listen: 127.0.0.1:8080
 public_url: https://hyfleet.example.com
 

@@ -89,8 +89,8 @@ jobs:
         with:
           name: release-${{ matrix.architecture }}
           path: |
-            output/releases/hyfleet-${{ env.RELEASE_VERSION }}-linux-${{ matrix.architecture }}.tar.gz
-            output/releases/hyfleet-${{ env.RELEASE_VERSION }}-linux-${{ matrix.architecture }}.tar.gz.sha256
+            output/releases/polyfleet-${{ env.RELEASE_VERSION }}-linux-${{ matrix.architecture }}.tar.gz
+            output/releases/polyfleet-${{ env.RELEASE_VERSION }}-linux-${{ matrix.architecture }}.tar.gz.sha256
           if-no-files-found: error
 
   release:
@@ -114,15 +114,15 @@ jobs:
             exit 1
           fi
           mkdir -p sbom/amd64 sbom/arm64
-          tar -xzf "release/hyfleet-${RELEASE_VERSION}-linux-amd64.tar.gz" -C sbom/amd64
-          tar -xzf "release/hyfleet-${RELEASE_VERSION}-linux-arm64.tar.gz" -C sbom/arm64
+          tar -xzf "release/polyfleet-${RELEASE_VERSION}-linux-amd64.tar.gz" -C sbom/amd64
+          tar -xzf "release/polyfleet-${RELEASE_VERSION}-linux-arm64.tar.gz" -C sbom/arm64
       - name: Generate amd64 SPDX SBOM
         uses: anchore/sbom-action@v0
         with:
           path: sbom/amd64
           format: spdx-json
-          output-file: release/hyfleet-${{ env.RELEASE_VERSION }}-linux-amd64.spdx.json
-          artifact-name: hyfleet-${{ env.RELEASE_VERSION }}-linux-amd64.spdx.json
+          output-file: release/polyfleet-${{ env.RELEASE_VERSION }}-linux-amd64.spdx.json
+          artifact-name: polyfleet-${{ env.RELEASE_VERSION }}-linux-amd64.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - name: Generate arm64 SPDX SBOM
@@ -130,8 +130,8 @@ jobs:
         with:
           path: sbom/arm64
           format: spdx-json
-          output-file: release/hyfleet-${{ env.RELEASE_VERSION }}-linux-arm64.spdx.json
-          artifact-name: hyfleet-${{ env.RELEASE_VERSION }}-linux-arm64.spdx.json
+          output-file: release/polyfleet-${{ env.RELEASE_VERSION }}-linux-arm64.spdx.json
+          artifact-name: polyfleet-${{ env.RELEASE_VERSION }}-linux-arm64.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - uses: sigstore/cosign-installer@v4.1.0
@@ -158,7 +158,7 @@ jobs:
           if gh release view "${RELEASE_VERSION}" >/dev/null 2>&1; then
             gh release upload "${RELEASE_VERSION}" "${assets[@]}" --clobber
           else
-            release_args=("${RELEASE_VERSION}" "${assets[@]}" --verify-tag --generate-notes --title "HyFleet ${RELEASE_VERSION}")
+            release_args=("${RELEASE_VERSION}" "${assets[@]}" --verify-tag --generate-notes --title "PolyFleet ${RELEASE_VERSION}")
             if [[ "${RELEASE_VERSION}" == *-* ]]; then
               release_args+=(--prerelease)
             fi
@@ -187,7 +187,7 @@ jobs:
       - id: metadata
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/sen62455/hyfleet
+          images: ghcr.io/sen62455/polyfleet
           tags: |
             type=raw,value=${{ env.RELEASE_VERSION }}
             type=raw,value=latest,enable=${{ !contains(env.RELEASE_VERSION, '-') }}
@@ -211,6 +211,6 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.0
       - name: Sign container digest with GitHub OIDC
         env:
-          IMAGE: ghcr.io/sen62455/hyfleet
+          IMAGE: ghcr.io/sen62455/polyfleet
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"

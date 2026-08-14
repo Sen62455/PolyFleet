@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/store"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -70,14 +70,14 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		t.Fatalf("unexpected Clash subscription: %#v", clashValue)
 	}
 	rules := strings.Join(clashValue.Rules, "\n")
-	if len(clashValue.ProxyGroups) != 1 || clashValue.ProxyGroups[0].Name != "HyFleet" ||
+	if len(clashValue.ProxyGroups) != 1 || clashValue.ProxyGroups[0].Name != "PolyFleet" ||
 		clashValue.ProxyGroups[0].Type != "select" || len(clashValue.ProxyGroups[0].Proxies) != 1 ||
 		clashValue.ProxyGroups[0].Proxies[0] != "IPv6 / Tokyo #1" ||
 		len(clashValue.Rules) < 3 || clashValue.Rules[0] != "DOMAIN-SUFFIX,cn,DIRECT" ||
 		!strings.Contains(rules, "DOMAIN-SUFFIX,douyin.com,DIRECT") ||
 		!strings.Contains(rules, "GEOIP,CN,DIRECT") ||
 		strings.Contains(rules, "198.18.0.0/16") ||
-		clashValue.Rules[len(clashValue.Rules)-1] != "MATCH,HyFleet" {
+		clashValue.Rules[len(clashValue.Rules)-1] != "MATCH,PolyFleet" {
 		t.Fatalf("Clash rule-mode configuration is incomplete: %#v", clashValue)
 	}
 
@@ -121,7 +121,7 @@ func TestSubscriptionRenderersProduceValidEmptyDocuments(t *testing.T) {
 	clash, err := renderSubscription("clash", empty)
 	if err != nil || !strings.Contains(string(clash.Body), "proxies: []") ||
 		!strings.Contains(string(clash.Body), "- DIRECT") ||
-		!strings.Contains(string(clash.Body), "- MATCH,HyFleet") {
+		!strings.Contains(string(clash.Body), "- MATCH,PolyFleet") {
 		t.Fatalf("empty Clash = %q, error = %v", clash.Body, err)
 	}
 	singBox, err := renderSubscription("sing-box", empty)

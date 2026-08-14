@@ -1,5 +1,5 @@
 [Unit]
-Description=HyFleet restricted node operations socket
+Description=PolyFleet restricted node operations socket
 
 [Socket]
 ListenStream=/run/hyfleet-agent-ops.sock

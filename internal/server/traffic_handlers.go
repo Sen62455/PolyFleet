@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyfleet/hyfleet/internal/protocol"
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/protocol"
+	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
 const (

@@ -15,7 +15,7 @@ not intended for internet-facing production deployments.
 Do not open a public issue for a suspected vulnerability, leaked credential, or
 unredacted configuration. Use GitHub's private vulnerability reporting form:
 
-<https://github.com/Sen62455/HyFleet/security/advisories/new>
+<https://github.com/Sen62455/PolyFleet/security/advisories/new>
 
 Include the affected version, deployment type, reproduction steps, expected
 impact, and whether the issue is already being exploited. Redact VPS addresses,
@@ -28,7 +28,7 @@ fix is available. These are response targets, not a paid bug-bounty commitment.
 
 ## Security boundaries
 
-- HyFleet Server must stay behind HTTPS. The native service listens on loopback;
+- PolyFleet Server must stay behind HTTPS. The native service listens on loopback;
   the Docker port is also bound to loopback by default.
 - Agent connections are outbound. Do not expose S-UI, Agent authentication, core
   traffic APIs, or the operations socket publicly.

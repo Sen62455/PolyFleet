@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/sen62455/hyfleet:${HYFLEET_VERSION:-v1.2.0}
+    image: ghcr.io/sen62455/polyfleet:${HYFLEET_VERSION:-v1.3.0}
     container_name: hyfleet-server
     restart: unless-stopped
     read_only: true

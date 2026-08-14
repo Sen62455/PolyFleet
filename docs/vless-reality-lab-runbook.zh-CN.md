@@ -1,4 +1,9 @@
-# VLESS Reality 实验分支单 Agent 验证手册
+# VLESS Reality 实验阶段验证记录
+
+> 本文是功能进入稳定版之前的历史实验记录。Reality 已在 PolyFleet `v1.3.0`
+> 晋升为固定配置的受管适配器；当前部署与使用请阅读
+> [PolyFleet 新手部署与使用](quick-start.zh-CN.md)。以下分支、手工构建和实验退出步骤
+> 仅用于追溯，不再是当前安装流程。
 
 本文只适用于 `experimental/vless-reality-singbox` 分支。该功能尚未进入
 HyFleet 稳定产品范围，不能把本手册当作生产部署或稳定升级承诺。

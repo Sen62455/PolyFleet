@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyfleet/hyfleet/internal/nodeops"
-	"github.com/hyfleet/hyfleet/internal/protocol"
+	"github.com/Sen62455/PolyFleet/internal/nodeops"
+	"github.com/Sen62455/PolyFleet/internal/protocol"
 )
 
 func TestExchangeHelperHalfClosesRequestBeforeReadingResponse(t *testing.T) {

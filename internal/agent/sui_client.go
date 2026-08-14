@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hyfleet/hyfleet/internal/protocol"
+	"github.com/Sen62455/PolyFleet/internal/protocol"
 )
 
 const maxSUIResponseBytes = 2 * 1024 * 1024

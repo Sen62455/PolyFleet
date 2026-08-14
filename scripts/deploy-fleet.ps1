@@ -66,10 +66,10 @@ foreach ($node in $fleet.Nodes) {
 
 Invoke-Checked gh auth status --hostname github.com
 
-$packageName = "hyfleet-$Version-linux-$($fleet.Architecture)"
+$packageName = "polyfleet-$Version-linux-$($fleet.Architecture)"
 $archiveName = "$packageName.tar.gz"
 $checksumName = "$archiveName.sha256"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("hyfleet-deploy-" + [guid]::NewGuid().ToString("N"))
+$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("polyfleet-deploy-" + [guid]::NewGuid().ToString("N"))
 $resolvedTemporaryParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
@@ -129,8 +129,8 @@ try {
             $scpArguments += @("-i", [string]$Node.IdentityFile)
         }
         $target = [string]$Node.Target
-        $remoteDirectory = "/tmp/hyfleet-deploy-" + [guid]::NewGuid().ToString("N")
-        if ($remoteDirectory -notmatch "^/tmp/hyfleet-deploy-[0-9a-f]{32}$") {
+        $remoteDirectory = "/tmp/polyfleet-deploy-" + [guid]::NewGuid().ToString("N")
+        if ($remoteDirectory -notmatch "^/tmp/polyfleet-deploy-[0-9a-f]{32}$") {
             throw "Generated remote directory is invalid"
         }
         try {
@@ -202,7 +202,7 @@ try {
 finally {
     $resolvedTemporaryRoot = [System.IO.Path]::GetFullPath($temporaryRoot)
     if ($resolvedTemporaryRoot.StartsWith($resolvedTemporaryParent, [System.StringComparison]::OrdinalIgnoreCase) -and
-        (Split-Path -Leaf $resolvedTemporaryRoot) -match "^hyfleet-deploy-[0-9a-f]{32}$" -and
+        (Split-Path -Leaf $resolvedTemporaryRoot) -match "^polyfleet-deploy-[0-9a-f]{32}$" -and
         (Test-Path -LiteralPath $resolvedTemporaryRoot)) {
         Remove-Item -LiteralPath $resolvedTemporaryRoot -Recurse -Force
     }

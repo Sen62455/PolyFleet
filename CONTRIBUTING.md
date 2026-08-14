@@ -1,6 +1,6 @@
-# Contributing to HyFleet
+# Contributing to PolyFleet
 
-HyFleet deliberately targets small personal fleets and low-resource VPS hosts.
+PolyFleet deliberately targets small personal fleets and low-resource VPS hosts.
 Changes should preserve that scope and the existing privilege boundary.
 
 ## Development setup

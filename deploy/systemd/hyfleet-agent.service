@@ -1,5 +1,6 @@
 [Unit]
-Description=HyFleet node Agent
+Description=PolyFleet node Agent (HyFleet-compatible runtime)
+Documentation=https://github.com/Sen62455/PolyFleet
 After=network-online.target
 Wants=network-online.target
 

@@ -1,5 +1,5 @@
 @{
-    Repository   = "Sen62455/HyFleet"
+    Repository   = "Sen62455/PolyFleet"
     Architecture = "amd64"
     Nodes        = @(
         @{

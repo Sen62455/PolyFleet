@@ -18,7 +18,7 @@ Usage:
     --master-key /path/hyfleet-server-master-key-TIME.key \
     --master-key-checksum /path/hyfleet-server-master-key-TIME.key.sha256
 
-Install the same or a newer HyFleet release first. Restore is supported only for
+Install the same or a newer PolyFleet release first. Restore is supported only for
 the standard native layout under /etc/hyfleet and /var/lib/hyfleet.
 EOF
 }
@@ -109,7 +109,7 @@ for required_path in "${archive_path}" "${checksum_path}" "${master_key_path}" "
     fail "every restore input must be an existing regular file, not a symlink"
 done
 [[ -x /usr/local/bin/hyfleet-server && -f /etc/hyfleet/server.yaml ]] ||
-  fail "install HyFleet Server before restoring a backup"
+  fail "install PolyFleet Server before restoring a backup"
 
 archive_name="$(basename -- "${archive_path}")"
 key_name="$(basename -- "${master_key_path}")"
@@ -180,7 +180,7 @@ for _ in {1..20}; do
   fi
   sleep 1
 done
-[[ "${healthy}" == true ]] || fail "restored HyFleet Server did not pass its health check"
+[[ "${healthy}" == true ]] || fail "restored PolyFleet Server did not pass its health check"
 
 committed=true
 rm -rf -- "${temporary_dir}"

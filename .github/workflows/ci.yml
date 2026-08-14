@@ -140,8 +140,8 @@ jobs:
         with:
           name: e2e-linux-amd64
           path: |
-            output/releases/hyfleet-v1.0.0-ci-linux-amd64.tar.gz
-            output/releases/hyfleet-v1.0.0-ci-linux-amd64.tar.gz.sha256
+            output/releases/polyfleet-v1.0.0-ci-linux-amd64.tar.gz
+            output/releases/polyfleet-v1.0.0-ci-linux-amd64.tar.gz.sha256
           if-no-files-found: error
 
   native-install:
@@ -160,15 +160,15 @@ jobs:
       - name: Extract release bundle
         shell: bash
         run: |
-          (cd e2e && sha256sum -c hyfleet-v1.0.0-ci-linux-amd64.tar.gz.sha256)
-          tar -xzf e2e/hyfleet-v1.0.0-ci-linux-amd64.tar.gz -C e2e
-          (cd e2e/hyfleet-v1.0.0-ci-linux-amd64 && sha256sum -c SHA256SUMS)
+          (cd e2e && sha256sum -c polyfleet-v1.0.0-ci-linux-amd64.tar.gz.sha256)
+          tar -xzf e2e/polyfleet-v1.0.0-ci-linux-amd64.tar.gz -C e2e
+          (cd e2e/polyfleet-v1.0.0-ci-linux-amd64 && sha256sum -c SHA256SUMS)
       - name: Install, upgrade, back up, and restore
         shell: bash
         run: >-
           bash tests/install-e2e.sh
           '${{ matrix.base_image }}'
-          e2e/hyfleet-v1.0.0-ci-linux-amd64
+          e2e/polyfleet-v1.0.0-ci-linux-amd64
 
   container:
     runs-on: ubuntu-24.04
@@ -183,23 +183,23 @@ jobs:
           --build-arg VERSION=v1.0.0-ci
           --build-arg "COMMIT=${GITHUB_SHA::12}"
           --build-arg BUILD_DATE=ci
-          --tag hyfleet:e2e
+          --tag polyfleet:e2e
           .
       - name: Run Server image
         shell: bash
         run: |
           set -Eeuo pipefail
-          cleanup() { docker rm -f hyfleet-container-e2e >/dev/null 2>&1 || true; }
+          cleanup() { docker rm -f polyfleet-container-e2e >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run --detach --name hyfleet-container-e2e \
+          docker run --detach --name polyfleet-container-e2e \
             --read-only --cap-drop ALL --security-opt no-new-privileges:true \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
             --publish 127.0.0.1:18080:8080 \
             --env HYFLEET_PUBLIC_URL=https://panel.example.com \
-            hyfleet:e2e
+            polyfleet:e2e
           healthy=false
           for _ in {1..30}; do
-            health_status="$(docker inspect --format '{{.State.Health.Status}}' hyfleet-container-e2e)"
+            health_status="$(docker inspect --format '{{.State.Health.Status}}' polyfleet-container-e2e)"
             if curl --fail --silent http://127.0.0.1:18080/healthz >/dev/null 2>&1 && \
               [[ "${health_status}" == "healthy" ]]; then
               healthy=true
@@ -208,5 +208,5 @@ jobs:
             sleep 1
           done
           [[ "${healthy}" == true ]]
-          docker exec hyfleet-container-e2e \
+          docker exec polyfleet-container-e2e \
             /usr/local/bin/hyfleet-server -check-database /data/server.db

@@ -18,7 +18,7 @@ Usage:
   sudo bash deploy/install-server.sh --public-url https://panel.example.com
 
 Options:
-  --public-url URL       Dedicated HTTPS origin for HyFleet (required initially)
+  --public-url URL       Dedicated HTTPS origin for PolyFleet (required initially)
   --listen ADDRESS      Loopback listen address (default: 127.0.0.1:8080)
   --replace-config      Replace /etc/hyfleet/server.yaml with generated settings
   -h, --help            Show this help
@@ -160,16 +160,16 @@ done
 if [[ "${healthy}" != true ]]; then
   systemctl status hyfleet-server --no-pager --full || true
   journalctl -u hyfleet-server -b -n 80 --no-pager || true
-  fail "HyFleet Server did not pass its local health check"
+  fail "PolyFleet Server did not pass its local health check"
 fi
 
 setup_status="$(curl --fail --silent --show-error "http://${health_listen}/api/v1/setup/status")"
 if grep -Eq '"setup_required"[[:space:]]*:[[:space:]]*false' <<<"${setup_status}"; then
   rm -f -- "${environment_path}"
   systemctl restart hyfleet-server
-  printf 'HyFleet Server is healthy; an administrator already exists.\n'
+  printf 'PolyFleet Server is healthy; an administrator already exists.\n'
 else
-  printf '\nHyFleet Server is healthy. Bootstrap token (do not share):\n%s\n\n' "${bootstrap_token}"
+  printf '\nPolyFleet Server is healthy. Bootstrap token (do not share):\n%s\n\n' "${bootstrap_token}"
   printf 'Open the configured HTTPS URL after the reverse proxy is ready.\n'
   printf 'After creating the administrator, run:\n'
   printf '  sudo rm -f %s && sudo systemctl restart hyfleet-server\n' "${environment_path}"

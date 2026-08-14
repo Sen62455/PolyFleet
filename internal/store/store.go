@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hyfleet/hyfleet/internal/store/migrations"
+	"github.com/Sen62455/PolyFleet/internal/store/migrations"
 	_ "modernc.org/sqlite"
 )
 

@@ -1,6 +1,6 @@
 [Unit]
-Description=HyFleet managed sing-box VLESS Reality data plane
-Documentation=https://github.com/Sen62455/HyFleet
+Description=PolyFleet managed sing-box VLESS Reality data plane
+Documentation=https://github.com/Sen62455/PolyFleet
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/etc/sing-box/hyfleet-reality.json

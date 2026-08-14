@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hyfleet/hyfleet/internal/cryptoutil"
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/cryptoutil"
+	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{3,32}$`)

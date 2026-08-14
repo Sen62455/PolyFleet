@@ -540,7 +540,7 @@ if [[ "${component}" == "server" ]]; then
     fi
     sleep 1
   done
-  [[ "${healthy}" == true ]] || fail "HyFleet Server health check failed"
+  [[ "${healthy}" == true ]] || fail "PolyFleet Server health check failed"
 elif [[ "${is_reality}" == true ]]; then
   reality_listen_port="$(sed -nE 's/^[[:space:]]*"listen_port"[[:space:]]*:[[:space:]]*([0-9]+),?[[:space:]]*$/\1/p' "${reality_core_config}")"
   [[ "$(printf '%s\n' "${reality_listen_port}" | grep -c '^[0-9][0-9]*$')" -eq 1 ]] ||
@@ -571,10 +571,10 @@ elif [[ "${is_reality}" == true ]]; then
   [[ "${api_healthy}" == true ]] || fail "Reality user control API health check failed"
   [[ "${listener_healthy}" == true ]] || fail "Reality TCP listener health check failed"
   systemctl is-active --quiet "${reality_service_unit}" || fail "Reality service did not remain active"
-  systemctl is-active --quiet "${service_name}" || fail "HyFleet Agent did not remain active"
+  systemctl is-active --quiet "${service_name}" || fail "PolyFleet Agent did not remain active"
 else
   sleep 3
-  systemctl is-active --quiet "${service_name}" || fail "HyFleet Agent did not remain active"
+  systemctl is-active --quiet "${service_name}" || fail "PolyFleet Agent did not remain active"
 fi
 
 committed=true

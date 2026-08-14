@@ -20,7 +20,7 @@ usage() {
   cat <<'EOF'
 Usage: bash scripts/build-sing-box-reality.sh [--output DIR]
 
-Builds the two HyFleet Reality sing-box artifacts from the pinned upstream
+Builds the two PolyFleet Reality sing-box compatibility artifacts from the pinned upstream
 commit, dependency graph, Go toolchain, and linker flags. The resulting hashes
 must match deploy/sing-box-reality.sha256. Existing output files are replaced
 only after both artifacts pass all checks.

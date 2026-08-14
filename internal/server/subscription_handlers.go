@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/hyfleet/hyfleet/internal/cryptoutil"
-	"github.com/hyfleet/hyfleet/internal/store"
+	"github.com/Sen62455/PolyFleet/internal/cryptoutil"
+	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
 const publicSubscriptionTokenMarker = "hys_"

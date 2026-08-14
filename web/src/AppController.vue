@@ -26,7 +26,7 @@ function friendlyError(error: unknown): string {
     };
     return messages[error.code] ?? `操作失败：${error.message}`;
   }
-  return "无法连接 HyFleet 服务，请检查服务状态后重试。";
+  return "无法连接 PolyFleet 服务，请检查服务状态后重试。";
 }
 
 async function initialize() {

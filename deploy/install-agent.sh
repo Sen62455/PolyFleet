@@ -41,10 +41,10 @@ Adapters:
   native-hysteria2    Hysteria2 systemd service
   standalone-sing-box
   s-ui
-  vless-reality       Experimental VLESS/TCP/Reality managed by the HyFleet sing-box build
+  vless-reality       Managed VLESS/TCP/Reality using the pinned compatibility build
 
 Options:
-  --server-url URL    HyFleet HTTPS origin (required initially)
+  --server-url URL    PolyFleet HTTPS origin (required initially)
   --node-name NAME    Local node label using letters, numbers, dot, dash, underscore
   --adapter TYPE      One adapter from the list above
   --service-unit UNIT Override the adapter's default systemd unit
@@ -56,7 +56,7 @@ Options:
 
 The vless-reality adapter uses fixed service, config, binary, and identity
 paths. --service-unit and --core-config-path may only repeat those fixed values.
-The installer never downloads sing-box. The release contains the pinned HyFleet
+The installer does not fetch sing-box separately. The release contains the pinned
 1.13.18-hyfleet-utls1.8.7-api2 build and its checksum manifest.
 EOF
 }
@@ -189,7 +189,7 @@ validate_reality_binary() {
     fail "checksum manifest has no unique entry for ${reality_artifact}"
   actual_hash="$(sha256sum "${binary_path}" | awk '{print $1}')"
   [[ "${actual_hash}" == "${expected_hash}" ]] ||
-    fail "${binary_path} checksum does not match the pinned HyFleet ${architecture} build"
+    fail "${binary_path} checksum does not match the pinned PolyFleet ${architecture} build"
   first_line="$("${binary_path}" version | sed -n '1p')"
   [[ "${first_line}" == "sing-box version ${reality_sing_box_version}" ]] ||
     fail "vless-reality requires sing-box ${reality_sing_box_version}; found ${first_line:-no version output}"
@@ -569,7 +569,7 @@ systemctl is-active --quiet hyfleet-agent || {
   fail "Agent did not remain active after removing the one-time enrollment token"
 }
 
-printf 'HyFleet Agent is enrolled and active. The one-time enrollment token was removed.\n'
+printf 'PolyFleet Agent is enrolled and active. The one-time enrollment token was removed.\n'
 if [[ "${configured_adapter}" == "s_ui" ]]; then
   printf 'The local S-UI API token remains in %s with restricted permissions.\n' "${environment_path}"
 fi
@@ -577,4 +577,4 @@ if [[ "${configured_adapter}" == "sing_box_vless_reality" ]]; then
   printf '%s is enabled and will start after the first valid Reality desired state.\n' \
     "${reality_service_unit}"
 fi
-printf 'Confirm that the node becomes online in the HyFleet dashboard.\n'
+printf 'Confirm that the node becomes online in the PolyFleet dashboard.\n'

@@ -110,4 +110,4 @@ if [[ "${component}" == server ]]; then
   printf '\n'
 fi
 
-printf '\nThis report does not print HyFleet environment files or Agent state credentials.\n'
+printf '\nThis report does not print PolyFleet environment files or Agent state credentials.\n'
