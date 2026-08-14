@@ -104,7 +104,7 @@ EOF
   systemctl enable --now hyfleet-agent-ops.socket
   systemctl is-active --quiet hyfleet-agent-ops.socket
   [[ -S /run/hyfleet-agent-ops.sock ]]
-  result="$(printf "%s" "${request}" | socat -t 10 - UNIX-CONNECT:/run/hyfleet-agent-ops.sock)"
+  result="$(printf "%s" "${request}" | timeout 10s nc -N -U /run/hyfleet-agent-ops.sock)"
   grep -q "\"status\":\"succeeded\"" <<<"${result}" || {
     printf "Agent configuration backup failed: %s\n" "${result}" >&2
     exit 1
