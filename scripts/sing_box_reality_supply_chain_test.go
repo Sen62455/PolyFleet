@@ -40,6 +40,7 @@ func TestSingBoxRealitySupplyChainContract(t *testing.T) {
 		`GOOS=linux`,
 		`GOMODCACHE=`,
 		`GOCACHE=`,
+		`chmod -R u+w`,
 		`go mod verify`,
 		`git apply --unidiff-zero --whitespace=error-all`,
 	} {

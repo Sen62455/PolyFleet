@@ -33,9 +33,12 @@ fail() {
 }
 
 cleanup() {
+  local exit_status=$?
   if [[ -n "${temporary_dir}" && -d "${temporary_dir}" ]]; then
-    rm -rf -- "${temporary_dir}"
+    chmod -R u+w -- "${temporary_dir}" 2>/dev/null || true
+    rm -rf -- "${temporary_dir}" || true
   fi
+  return "${exit_status}"
 }
 trap cleanup EXIT
 trap 'printf "ERROR: sing-box build failed at line %s.\n" "$LINENO" >&2' ERR
@@ -57,7 +60,7 @@ while (($# > 0)); do
   esac
 done
 
-for command_name in awk git go install mkdir mktemp od sed sha256sum tee tr; do
+for command_name in awk chmod git go install mkdir mktemp od sed sha256sum tee tr; do
   command -v "${command_name}" >/dev/null 2>&1 || fail "required command is missing: ${command_name}"
 done
 [[ -f "${manifest_path}" && ! -L "${manifest_path}" ]] ||
