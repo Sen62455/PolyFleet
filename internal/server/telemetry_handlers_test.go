@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/Sen62455/PolyFleet/internal/cryptoutil"
 	"github.com/Sen62455/PolyFleet/internal/protocol"
+	"github.com/google/uuid"
 )
 
 func TestNodeTelemetryLatestSnapshotAndFailureRetention(t *testing.T) {

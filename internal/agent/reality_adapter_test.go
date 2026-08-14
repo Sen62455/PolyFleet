@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/Sen62455/PolyFleet/internal/config"
 	"github.com/Sen62455/PolyFleet/internal/nodeops"
 	"github.com/Sen62455/PolyFleet/internal/protocol"
+	"github.com/google/uuid"
 )
 
 func TestRealityDesiredFetchesEligibleMaterialAndAcknowledgesPublicIdentity(t *testing.T) {

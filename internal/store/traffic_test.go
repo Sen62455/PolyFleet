@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/Sen62455/PolyFleet/internal/protocol"
+	"github.com/google/uuid"
 )
 
 func TestTrafficIngestionIsIdempotentAndEnforcesNodeAndGlobalQuotas(t *testing.T) {

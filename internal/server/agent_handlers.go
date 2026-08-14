@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/Sen62455/PolyFleet/internal/protocol"
 	"github.com/Sen62455/PolyFleet/internal/store"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func (a *App) handleAgentEnroll(response http.ResponseWriter, request *http.Request) {
