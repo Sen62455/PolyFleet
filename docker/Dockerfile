@@ -1,23 +1,25 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 WORKDIR /src
 RUN corepack enable && corepack prepare pnpm@11.16.0 --activate
 COPY web ./web
 COPY internal/webui ./internal/webui
 RUN pnpm --dir web install --frozen-lockfile && pnpm --dir web build
 
-FROM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
+ARG TARGETOS
+ARG TARGETARCH
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY --from=web /src/internal/webui/dist ./internal/webui/dist
-RUN CGO_ENABLED=0 GOOS=linux go build -tags webui -trimpath \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -tags webui -trimpath \
     -ldflags="-s -w -X github.com/Sen62455/PolyFleet/internal/buildinfo.Version=${VERSION} -X github.com/Sen62455/PolyFleet/internal/buildinfo.Commit=${COMMIT} -X github.com/Sen62455/PolyFleet/internal/buildinfo.Date=${BUILD_DATE}" \
     -o /out/hyfleet-server ./cmd/server
 
