@@ -135,6 +135,9 @@ separate, recoverable operator decision.
 
 ## Post-v1 candidates
 
-Multi-admin RBAC/TOTP, Telegram/webhook alerts, approved Ansible jobs, PostgreSQL,
+Subscription operations, bounded traffic reports, encrypted Telegram/webhook
+notifications, VPS asset metadata, filtered pagination, and bounded batch node
+operations are implemented by migration `0014_operations_layer.sql`. Remaining
+candidates include multi-admin RBAC/TOTP, approved Ansible jobs, PostgreSQL,
 more protocols, device limits, and larger-fleet push optimization. Each requires
 a new ADR and measured need.

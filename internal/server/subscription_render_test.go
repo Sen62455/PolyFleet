@@ -53,6 +53,24 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		t.Fatalf("renderSubscription(clash) error = %v", err)
 	}
 	var clashValue struct {
+		Mode          string `yaml:"mode"`
+		IPv6          bool   `yaml:"ipv6"`
+		TCPConcurrent bool   `yaml:"tcp-concurrent"`
+		DNS           struct {
+			Enable                bool                `yaml:"enable"`
+			EnhancedMode          string              `yaml:"enhanced-mode"`
+			Nameserver            []string            `yaml:"nameserver"`
+			NameserverPolicy      map[string][]string `yaml:"nameserver-policy"`
+			ProxyServerNameserver []string            `yaml:"proxy-server-nameserver"`
+		} `yaml:"dns"`
+		Sniffer struct {
+			Enable bool `yaml:"enable"`
+		} `yaml:"sniffer"`
+		Tun struct {
+			Enable    bool     `yaml:"enable"`
+			Stack     string   `yaml:"stack"`
+			DNSHijack []string `yaml:"dns-hijack"`
+		} `yaml:"tun"`
 		Proxies     []map[string]any `yaml:"proxies"`
 		ProxyGroups []struct {
 			Name    string   `yaml:"name"`
@@ -66,16 +84,31 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 	}
 	if len(clashValue.Proxies) != 1 || clashValue.Proxies[0]["password"] != "user:p@ss/?# value" ||
 		clashValue.Proxies[0]["server"] != "2001:db8::1" || clashValue.Proxies[0]["skip-cert-verify"] != true ||
-		clashValue.Proxies[0]["fingerprint"] != certificateFingerprint {
+		clashValue.Proxies[0]["fingerprint"] != certificateFingerprint || clashValue.Proxies[0]["udp"] != true {
 		t.Fatalf("unexpected Clash subscription: %#v", clashValue)
 	}
 	rules := strings.Join(clashValue.Rules, "\n")
-	if len(clashValue.ProxyGroups) != 1 || clashValue.ProxyGroups[0].Name != "PolyFleet" ||
-		clashValue.ProxyGroups[0].Type != "select" || len(clashValue.ProxyGroups[0].Proxies) != 1 ||
-		clashValue.ProxyGroups[0].Proxies[0] != "IPv6 / Tokyo #1" ||
-		len(clashValue.Rules) < 3 || clashValue.Rules[0] != "DOMAIN-SUFFIX,cn,DIRECT" ||
-		!strings.Contains(rules, "DOMAIN-SUFFIX,douyin.com,DIRECT") ||
-		!strings.Contains(rules, "GEOIP,CN,DIRECT") ||
+	clashDocument := strings.ToUpper(string(clash.Body))
+	if clashValue.Mode != "rule" || clashValue.IPv6 || !clashValue.TCPConcurrent ||
+		!clashValue.DNS.Enable || clashValue.DNS.EnhancedMode != "fake-ip" || len(clashValue.DNS.Nameserver) != 2 ||
+		!strings.HasSuffix(clashValue.DNS.Nameserver[0], "#PolyFleet") ||
+		!strings.HasSuffix(clashValue.DNS.Nameserver[1], "#PolyFleet") ||
+		len(clashValue.DNS.NameserverPolicy["+.cn"]) != 2 ||
+		len(clashValue.DNS.NameserverPolicy["+.qq.com"]) != 2 ||
+		len(clashValue.DNS.ProxyServerNameserver) != 2 ||
+		!clashValue.Sniffer.Enable || clashValue.Tun.Enable || clashValue.Tun.Stack != "mixed" ||
+		len(clashValue.Tun.DNSHijack) != 2 ||
+		len(clashValue.ProxyGroups) != 2 || clashValue.ProxyGroups[0].Name != "PolyFleet" ||
+		clashValue.ProxyGroups[0].Type != "select" || len(clashValue.ProxyGroups[0].Proxies) != 3 ||
+		clashValue.ProxyGroups[0].Proxies[0] != "自动选择" ||
+		clashValue.ProxyGroups[0].Proxies[1] != "IPv6 / Tokyo #1" ||
+		clashValue.ProxyGroups[0].Proxies[2] != "DIRECT" ||
+		clashValue.ProxyGroups[1].Name != "自动选择" || clashValue.ProxyGroups[1].Type != "url-test" ||
+		len(clashValue.Rules) < 3 || clashValue.Rules[0] != "DOMAIN,localhost,DIRECT" ||
+		!strings.Contains(rules, "DOMAIN-SUFFIX,cn,DIRECT") ||
+		!strings.Contains(rules, "DOMAIN-SUFFIX,qq.com,DIRECT") ||
+		strings.Contains(clashDocument, "GEOSITE") || strings.Contains(clashDocument, "GEOIP") ||
+		strings.Contains(clashDocument, "FALLBACK:") ||
 		strings.Contains(rules, "198.18.0.0/16") ||
 		clashValue.Rules[len(clashValue.Rules)-1] != "MATCH,PolyFleet" {
 		t.Fatalf("Clash rule-mode configuration is incomplete: %#v", clashValue)
@@ -191,11 +224,13 @@ func TestSubscriptionRenderersSupportMixedHysteria2AndVLESSReality(t *testing.T)
 		t.Fatalf("yaml.Unmarshal() error = %v; body = %s", err, clash.Body)
 	}
 	if len(clashValue.Proxies) != 2 || clashValue.Proxies[0]["type"] != "hysteria2" ||
+		clashValue.Proxies[0]["udp"] != true ||
 		clashValue.Proxies[1]["type"] != "vless" ||
 		clashValue.Proxies[1]["uuid"] != "9c33cc92-54e0-427e-8214-a45e62c05e11" ||
 		clashValue.Proxies[1]["network"] != "tcp" || clashValue.Proxies[1]["tls"] != true ||
 		clashValue.Proxies[1]["flow"] != "xtls-rprx-vision" ||
-		clashValue.Proxies[1]["client-fingerprint"] != "chrome" {
+		clashValue.Proxies[1]["client-fingerprint"] != "chrome" ||
+		clashValue.Proxies[1]["udp"] != true || clashValue.Proxies[1]["packet-encoding"] != "xudp" {
 		t.Fatalf("unexpected mixed Clash subscription: %#v", clashValue.Proxies)
 	}
 	realityOptions, ok := clashValue.Proxies[1]["reality-opts"].(map[string]any)

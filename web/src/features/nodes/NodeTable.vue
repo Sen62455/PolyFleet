@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { h } from "vue";
+import { computed, h } from "vue";
 import { Archive, KeyRound, MoreHorizontal, Pencil, ServerCog, Wifi } from "@lucide/vue";
-import { NButton, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
+import { NButton, NCheckbox, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
 import MetricBar from "../../components/MetricBar.vue";
 import StatusIndicator from "../../components/StatusIndicator.vue";
 import {
@@ -14,11 +14,25 @@ import {
 } from "../../lib/format";
 import type { NodeRecord } from "../../types";
 
-defineProps<{ nodes: NodeRecord[] }>();
+const props = withDefaults(defineProps<{ nodes: NodeRecord[]; selectedNodeIds?: string[] }>(), { selectedNodeIds: () => [] });
 const emit = defineEmits<{
   select: [node: NodeRecord];
   action: [action: "edit" | "enroll" | "archive", node: NodeRecord];
+  "update:selected-node-ids": [nodeIds: string[]];
 }>();
+
+const allSelected = computed(() => props.nodes.length > 0 && props.nodes.every((node) => props.selectedNodeIds.includes(node.id)));
+
+function setSelected(nodeId: string, selected: boolean) {
+  const next = new Set(props.selectedNodeIds);
+  if (selected) next.add(nodeId);
+  else next.delete(nodeId);
+  emit("update:selected-node-ids", [...next]);
+}
+
+function setAll(selected: boolean) {
+  emit("update:selected-node-ids", selected ? props.nodes.map((node) => node.id) : []);
+}
 
 function icon(component: typeof Pencil) {
   return () => h(NIcon, null, { default: () => h(component, { size: 16 }) });
@@ -41,6 +55,7 @@ function choose(key: string | number, node: NodeRecord) {
     <table class="node-table">
       <thead>
         <tr>
+          <th class="node-table__select"><n-checkbox :checked="allSelected" :indeterminate="selectedNodeIds.length > 0 && !allSelected" aria-label="选择全部节点" @update:checked="setAll" /></th>
           <th>节点</th>
           <th>状态</th>
           <th>资源</th>
@@ -58,6 +73,7 @@ function choose(key: string | number, node: NodeRecord) {
           @click="emit('select', node)"
           @keydown.enter="emit('select', node)"
         >
+          <td class="node-table__select" @click.stop @keydown.stop><n-checkbox :checked="selectedNodeIds.includes(node.id)" :aria-label="`选择 ${node.name}`" @update:checked="setSelected(node.id, $event)" /></td>
           <td>
             <div class="node-identity">
               <span class="node-identity__icon"><server-cog :size="18" aria-hidden="true" /></span>
@@ -120,6 +136,7 @@ function choose(key: string | number, node: NodeRecord) {
   <div class="node-mobile-list">
     <article v-for="node in nodes" :key="node.id" class="node-mobile-item" @click="emit('select', node)">
       <header>
+        <div @click.stop><n-checkbox :checked="selectedNodeIds.includes(node.id)" :aria-label="`选择 ${node.name}`" @update:checked="setSelected(node.id, $event)" /></div>
         <div class="node-identity">
           <span class="node-identity__icon"><server-cog :size="18" aria-hidden="true" /></span>
           <span>

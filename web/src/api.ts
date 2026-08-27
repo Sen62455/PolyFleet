@@ -23,6 +23,20 @@ import type {
   UserCredential,
   UserInput,
   UserRecord,
+  BulkNodeAction,
+  BulkNodeResult,
+  NodeAssetInput,
+  NodeAssetRecord,
+  NotificationNotifierInput,
+  NotificationNotifierRecord,
+  NotificationSettings,
+  NotificationReminderRuleInput,
+  NotificationReminderRuleRecord,
+  TelegramBotAccessRecord,
+  SubscriptionOperationPage,
+  SubscriptionOperationPatch,
+  SubscriptionOperationRecord,
+  TrafficReport,
 } from "./types";
 
 export class APIError extends Error {
@@ -211,6 +225,91 @@ export const api = {
     return result.alerts;
   },
 
+  listNodeAssets: async () => {
+    const result = await request<{ assets: NodeAssetRecord[] }>("/api/v1/assets");
+    return result.assets;
+  },
+
+  updateNodeAsset: (nodeId: string, input: NodeAssetInput) =>
+    request<NodeAssetRecord>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/asset`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  listSubscriptionOperations: (filters: {
+    status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.status && filters.status !== "all") query.set("status", filters.status);
+    if (filters.search) query.set("search", filters.search);
+    query.set("limit", String(filters.limit ?? 50));
+    query.set("offset", String(filters.offset ?? 0));
+    return request<SubscriptionOperationPage>(`/api/v1/subscriptions?${query.toString()}`);
+  },
+
+  updateSubscriptionOperation: (tokenId: string, input: SubscriptionOperationPatch) =>
+    request<SubscriptionOperationRecord>(`/api/v1/subscriptions/${encodeURIComponent(tokenId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  trafficReport: (range: "7d" | "30d" = "30d") =>
+    request<TrafficReport>(`/api/v1/reports/traffic?range=${encodeURIComponent(range)}&group_by=all`),
+
+  getNotificationSettings: () =>
+    request<NotificationSettings>("/api/v1/settings/notifications"),
+
+  saveNotificationNotifier: (input: NotificationNotifierInput) =>
+    request<NotificationNotifierRecord>("/api/v1/settings/notifications", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  testNotificationNotifier: (notifierId: string) =>
+    request<{ delivered: boolean; response_code: number }>(
+      `/api/v1/notifiers/${encodeURIComponent(notifierId)}/test`,
+      { method: "POST", body: "{}" },
+    ),
+
+  deleteNotificationNotifier: (notifierId: string) =>
+    request<void>(`/api/v1/notifiers/${encodeURIComponent(notifierId)}`, {
+      method: "DELETE",
+      body: "{}",
+    }),
+
+  saveNotificationReminderRule: (input: NotificationReminderRuleInput) =>
+    request<NotificationReminderRuleRecord>("/api/v1/reminder-rules", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  runNotificationReminderRule: (ruleId: string) =>
+    request<{ sent: boolean; result: string }>(
+      `/api/v1/reminder-rules/${encodeURIComponent(ruleId)}/run`,
+      { method: "POST", body: "{}" },
+    ),
+
+  deleteNotificationReminderRule: (ruleId: string) =>
+    request<void>(`/api/v1/reminder-rules/${encodeURIComponent(ruleId)}`, {
+      method: "DELETE",
+      body: "{}",
+    }),
+
+  updateTelegramBotAccess: (notifierId: string, enabled: boolean) =>
+    request<TelegramBotAccessRecord>(
+      `/api/v1/notifiers/${encodeURIComponent(notifierId)}/telegram-bot`,
+      { method: "PUT", body: JSON.stringify({ enabled }) },
+    ),
+
+  bulkNodes: (nodeIds: string[], action: BulkNodeAction, maxLines = 0) =>
+    request<{ results: BulkNodeResult[] }>("/api/v1/nodes/bulk", {
+      method: "POST",
+      body: JSON.stringify({ node_ids: nodeIds, action, max_lines: maxLines }),
+    }),
+
   acknowledgeAlert: (alertId: string) =>
     request<AlertRecord>(`/api/v1/alerts/${encodeURIComponent(alertId)}/acknowledge`, {
       method: "POST",
@@ -239,8 +338,16 @@ export const api = {
     ),
 
   async listUsers() {
-    const result = await request<{ users: UserRecord[] }>("/api/v1/users");
+    const result = await request<{ users: UserRecord[] }>("/api/v1/users?limit=500");
     return result.users;
+  },
+
+  listUsersPage: (filters: { search?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.search) query.set("search", filters.search);
+    query.set("limit", String(filters.limit ?? 50));
+    query.set("offset", String(filters.offset ?? 0));
+    return request<import("./types").UserPage>(`/api/v1/users?${query.toString()}`);
   },
 
   createUser: (input: UserInput) =>

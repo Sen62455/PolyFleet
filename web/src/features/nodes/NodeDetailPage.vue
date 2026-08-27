@@ -15,6 +15,7 @@ import { api, APIError } from "../../api";
 import MetricChart, { type ChartSeries } from "../../components/MetricChart.vue";
 import NodeSignalRail from "../../components/NodeSignalRail.vue";
 import StatusIndicator from "../../components/StatusIndicator.vue";
+import TrendSparkline from "../../components/TrendSparkline.vue";
 import {
   adapterLabels,
   formatBytes,
@@ -44,7 +45,10 @@ const metricRange = ref<MetricRange>("24h");
 const metrics = ref<NodeMetricSeries>({ range: "24h", step_seconds: 60, samples: [] });
 const metricsLoading = ref(false);
 const metricsError = ref("");
+const kpiTrends = ref<NodeMetricSeries>({ range: "6h", step_seconds: 60, samples: [] });
 const telemetryPanel = ref<InstanceType<typeof HostTelemetryPanel> | null>(null);
+type DetailSection = "performance" | "runtime" | "configuration";
+const activeSection = ref<DetailSection>("performance");
 type TrafficUnit = "GiB" | "TiB";
 const calibrationValue = ref(0);
 const calibrationUnit = ref<TrafficUnit>("GiB");
@@ -113,11 +117,29 @@ const diskSeries = computed<ChartSeries[]>(() => [
   { name: "写入", color: "var(--hf-chart-tertiary)", values: metrics.value.samples.map((sample) => sample.disk_write_bytes_per_second) },
 ]);
 
+function kpiTrendValues(metric: "cpu" | "memory" | "disk") {
+  const samples = kpiTrends.value.samples;
+  if (metric === "cpu") return samples.map((s) => s.cpu_percent);
+  if (metric === "memory") return samples.map((s) => percent(s.memory_used_bytes, s.memory_total_bytes));
+  return samples.map((s) => percent(s.disk_used_bytes, s.disk_total_bytes));
+}
+
 async function loadMetrics(silent = false) {
   if (!silent) metricsLoading.value = true;
   metricsError.value = "";
   try {
     metrics.value = await api.getNodeMetrics(props.node.id, metricRange.value);
+    if (!silent) {
+      if (metricRange.value === "6h") {
+        kpiTrends.value = metrics.value;
+      } else {
+        api.getNodeMetrics(props.node.id, "6h")
+          .then((series) => { kpiTrends.value = series; })
+          .catch((error: unknown) => {
+            if (error instanceof APIError && error.status === 401) emit("session-expired");
+          });
+      }
+    }
   } catch (error) {
     if (error instanceof APIError && error.status === 401) {
       emit("session-expired");
@@ -186,14 +208,52 @@ async function calibrateTraffic() {
   }
 }
 
+const detailSections: Array<{ key: DetailSection; elementID: string }> = [
+  { key: "performance", elementID: "node-performance" },
+  { key: "runtime", elementID: "node-runtime" },
+  { key: "configuration", elementID: "node-configuration" },
+];
+
 let refreshTimer: number | undefined;
+let detailScrollRoot: HTMLElement | null = null;
+let detailScrollFrame: number | undefined;
+
+function syncActiveSection() {
+  detailScrollFrame = undefined;
+  if (!detailScrollRoot) return;
+
+  const activationLine = detailScrollRoot.getBoundingClientRect().top + 72;
+  let nextSection: DetailSection = "performance";
+  for (const section of detailSections) {
+    const element = document.getElementById(section.elementID);
+    if (element && element.getBoundingClientRect().top <= activationLine) nextSection = section.key;
+  }
+  activeSection.value = nextSection;
+}
+
+function scheduleSectionSync() {
+  if (detailScrollFrame !== undefined) return;
+  detailScrollFrame = window.requestAnimationFrame(syncActiveSection);
+}
+
+function markActiveSection(section: DetailSection) {
+  activeSection.value = section;
+}
+
 onMounted(() => {
   void loadMetrics();
+  detailScrollRoot = document.querySelector<HTMLElement>(".console-content > .n-layout-scroll-container");
+  detailScrollRoot?.addEventListener("scroll", scheduleSectionSync, { passive: true });
+  window.requestAnimationFrame(syncActiveSection);
   refreshTimer = window.setInterval(() => {
     if (document.visibilityState === "visible") void loadMetrics(true);
   }, 30_000);
 });
-onBeforeUnmount(() => window.clearInterval(refreshTimer));
+onBeforeUnmount(() => {
+  window.clearInterval(refreshTimer);
+  detailScrollRoot?.removeEventListener("scroll", scheduleSectionSync);
+  if (detailScrollFrame !== undefined) window.cancelAnimationFrame(detailScrollFrame);
+});
 watch(metricRange, () => void loadMetrics());
 watch(() => props.node.id, () => void loadMetrics());
 </script>
@@ -239,9 +299,24 @@ watch(() => props.node.id, () => void loadMetrics());
     </header>
 
     <nav class="node-detail-nav" aria-label="节点详情导航">
-      <a href="#node-performance">性能轨迹</a>
-      <a href="#node-runtime">进程与服务</a>
-      <a href="#node-configuration">配置与运维</a>
+      <a
+        href="#node-performance"
+        :class="{ 'is-active': activeSection === 'performance' }"
+        :aria-current="activeSection === 'performance' ? 'location' : undefined"
+        @click="markActiveSection('performance')"
+      >性能轨迹</a>
+      <a
+        href="#node-runtime"
+        :class="{ 'is-active': activeSection === 'runtime' }"
+        :aria-current="activeSection === 'runtime' ? 'location' : undefined"
+        @click="markActiveSection('runtime')"
+      >进程与服务</a>
+      <a
+        href="#node-configuration"
+        :class="{ 'is-active': activeSection === 'configuration' }"
+        :aria-current="activeSection === 'configuration' ? 'location' : undefined"
+        @click="markActiveSection('configuration')"
+      >配置与运维</a>
     </nav>
 
     <section id="node-performance" class="node-performance-layout" aria-label="节点性能">
@@ -296,18 +371,21 @@ watch(() => props.node.id, () => void loadMetrics());
             <header><span>CPU 使用率</span><small>{{ node.cpu_cores || "-" }} 核</small></header>
             <strong>{{ formatPercent(node.cpu_percent) }}</strong>
             <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(node.cpu_percent) }" /></div>
+            <trend-sparkline :values="kpiTrendValues('cpu')" :label="`${node.name} CPU 六小时趋势`" />
             <small>1 分钟负载 {{ node.load_1.toFixed(2) }}</small>
           </article>
           <article class="host-kpi host-kpi--primary">
             <header><span>内存占用</span><small>{{ formatBytes(node.memory_total_bytes) }}</small></header>
             <strong>{{ formatPercent(memoryPercent) }}</strong>
             <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(memoryPercent) }" /></div>
+            <trend-sparkline :values="kpiTrendValues('memory')" :label="`${node.name} 内存六小时趋势`" color="var(--hf-flow)" />
             <small>{{ formatBytes(node.memory_used_bytes) }} · Swap {{ formatBytes(node.swap_used_bytes) }}</small>
           </article>
           <article class="host-kpi host-kpi--primary">
             <header><span>根分区</span><small>{{ formatBytes(node.disk_total_bytes) }}</small></header>
             <strong>{{ formatPercent(diskPercent) }}</strong>
             <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(diskPercent) }" /></div>
+            <trend-sparkline :values="kpiTrendValues('disk')" :label="`${node.name} 磁盘六小时趋势`" color="var(--hf-pressure)" />
             <small>{{ formatBytes(node.disk_used_bytes) }} 已用</small>
           </article>
           <article class="host-kpi host-kpi--context">
@@ -369,7 +447,7 @@ watch(() => props.node.id, () => void loadMetrics());
             </template>
           </dl>
         </section>
-        <section class="detail-band">
+        <section class="detail-band detail-band--user-traffic">
           <div class="detail-section__heading">
             <h2>用户流量与在线</h2>
           </div>

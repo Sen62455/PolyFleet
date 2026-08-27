@@ -93,7 +93,11 @@ type credentialResponse struct {
 }
 
 func (a *App) handleListUsers(response http.ResponseWriter, request *http.Request) {
-	users, err := a.store.ListUsers(request.Context())
+	limit := boundedQueryLimit(request.URL.Query().Get("limit"), 100, 500)
+	offset := queryOffset(request.URL.Query().Get("offset"))
+	users, total, err := a.store.ListUsersPage(
+		request.Context(), request.URL.Query().Get("search"), limit, offset,
+	)
 	if err != nil {
 		a.logger.Error("list users failed", "request_id", requestIDFromContext(request.Context()), "error", err)
 		a.writeError(response, request, http.StatusInternalServerError, "users_read_failed", "could not read users")
@@ -104,7 +108,9 @@ func (a *App) handleListUsers(response http.ResponseWriter, request *http.Reques
 	for _, user := range users {
 		result = append(result, presentUser(user, now))
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"users": result})
+	writeJSON(response, http.StatusOK, map[string]any{
+		"users": result, "total": total, "limit": limit, "offset": offset,
+	})
 }
 
 func (a *App) handleGetUser(response http.ResponseWriter, request *http.Request) {

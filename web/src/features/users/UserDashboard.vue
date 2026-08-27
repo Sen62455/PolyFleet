@@ -30,6 +30,9 @@ const message = useMessage();
 const dialog = useDialog();
 
 const users = ref<UserRecord[]>([]);
+const totalUsers = ref(0);
+const userOffset = ref(0);
+const userPageSize = 50;
 const loading = ref(true);
 const refreshing = ref(false);
 const loadError = ref("");
@@ -73,11 +76,7 @@ const userFilters: Array<{ value: UserFilter; label: string }> = [
   { value: "attention", label: "需关注" },
 ];
 const filteredUsers = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase();
   return users.value.filter((user) => {
-    const matchesQuery = !query || [user.display_name, user.username, user.notes]
-      .some((value) => value.toLocaleLowerCase().includes(query));
-    if (!matchesQuery) return false;
     if (userFilter.value === "active") return user.status === "active" && user.quota_state !== "limited";
     if (userFilter.value === "online") return user.online_connections > 0;
     if (userFilter.value === "attention") return user.status !== "active" || user.quota_state === "limited";
@@ -125,22 +124,41 @@ async function loadSubscriptionTokens(userId: string) {
 }
 
 async function loadUsers(silent = false) {
-  if (refreshing.value) return;
   if (!silent) loading.value = users.value.length === 0;
   refreshing.value = true;
   loadError.value = "";
+  const requestID = ++usersRequestID;
   try {
-    users.value = await api.listUsers();
+    const page = await api.listUsersPage({
+      search: searchQuery.value.trim(),
+      limit: userPageSize,
+      offset: userOffset.value,
+    });
+    if (requestID !== usersRequestID) return;
+    users.value = page.users;
+    totalUsers.value = page.total;
+    if (detailUserID.value && !page.users.some((user) => user.id === detailUserID.value)) {
+      detailUserID.value = null;
+    }
   } catch (error) {
+    if (requestID !== usersRequestID) return;
     if (error instanceof APIError && error.status === 401) {
       emit("session-expired");
       return;
     }
     loadError.value = error instanceof APIError ? error.message : "用户列表加载失败。";
   } finally {
-    loading.value = false;
-    refreshing.value = false;
+    if (requestID === usersRequestID) {
+      loading.value = false;
+      refreshing.value = false;
+    }
   }
+}
+
+function changeUserPage(offset: number) {
+  userOffset.value = Math.max(0, offset);
+  detailUserID.value = null;
+  void loadUsers();
 }
 
 function openCreate() {
@@ -486,6 +504,16 @@ function rotateUserCredentials(user: UserRecord) {
   });
 }
 
+let usersRequestID = 0;
+let searchTimer: number | undefined;
+watch(searchQuery, () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    userOffset.value = 0;
+    void loadUsers();
+  }, 300);
+});
+
 watch(detailUserID, (userID) => {
   if (userID) {
     loadSubscriptionTokens(userID);
@@ -513,6 +541,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   window.clearInterval(refreshTimer);
+  window.clearTimeout(searchTimer);
   compactDetailQuery?.removeEventListener("change", updateCompactDetail);
 });
 </script>
@@ -553,7 +582,7 @@ onBeforeUnmount(() => {
     <section class="fleet-summary users-summary" aria-label="用户摘要">
       <div class="fleet-summary__item">
         <span>全部用户</span>
-        <strong>{{ users.length }}</strong>
+        <strong>{{ totalUsers }}</strong>
       </div>
       <div class="fleet-summary__item fleet-summary__item--healthy">
         <span>活跃连接</span>
@@ -598,7 +627,7 @@ onBeforeUnmount(() => {
           {{ filter.label }}
         </button>
       </div>
-      <span class="user-filter-result">{{ filteredUsers.length }} / {{ users.length }}</span>
+      <span class="user-filter-result">本页 {{ filteredUsers.length }} / {{ users.length }} · 共 {{ totalUsers }}</span>
     </section>
 
       <section class="node-surface users-surface" aria-label="用户列表">
@@ -622,6 +651,11 @@ onBeforeUnmount(() => {
           @select="openDetail"
           @action="handleAction"
         />
+        <footer v-if="totalUsers > userPageSize" class="ops-pagination">
+          <span>{{ userOffset + 1 }} - {{ Math.min(userOffset + users.length, totalUsers) }} / {{ totalUsers }}</span>
+          <n-button size="small" :disabled="userOffset === 0" @click="changeUserPage(userOffset - userPageSize)">上一页</n-button>
+          <n-button size="small" :disabled="userOffset + userPageSize >= totalUsers" @click="changeUserPage(userOffset + userPageSize)">下一页</n-button>
+        </footer>
       </section>
     </section>
 

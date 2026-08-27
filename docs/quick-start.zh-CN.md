@@ -139,6 +139,12 @@ Reality 节点应是没有其他 PolyFleet Agent、没有需要保留的 `/usr/b
 目标 TCP 端口未被占用的干净 VPS。当前固定配置为 VLESS over direct TCP、Reality、
 `xtls-rprx-vision`。不支持 WebSocket、gRPC、HTTPUpgrade 或任意 sing-box JSON。
 
+一套受管 Reality 数据面只能由一个 PolyFleet Agent 和一个控制面收敛。如果同一 VPS 的
+Agent 已指向生产控制面，就不会同时出现在实验控制面；不要复制 Agent 状态或并行启动第二
+个受管 Agent，否则两个控制面会竞争同一个 sing-box 配置和身份。迁移控制面时，应先在旧
+控制面禁用节点、停止旧 Agent并备份节点状态，再在新控制面重新注册。仅观察同一主机需要
+独立的只读探针模式，当前标准 Agent 不提供该模式。
+
 在面板添加节点：
 
 - 适配器选择“VLESS Reality”；
@@ -210,6 +216,10 @@ sudo ss -ltnp
   该基准加上新采集的代理流量估算；新周期会清除旧校准。
 
 ## 10. 更新、备份、恢复和排障
+
+订阅额度/到期运营、7/30 天流量报表、告警通知、VPS 套餐与到期档案、分页和批量节点操作
+见[运营层说明](18-operations-layer.zh-CN.md)。通知通道密钥依赖 master key，恢复时必须
+连同数据库一起恢复。
 
 每次更新先备份 Server，并先更新 Server、后更新 Agent：
 

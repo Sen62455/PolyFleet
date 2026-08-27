@@ -5,8 +5,8 @@ export type ColorModePreference = ColorMode | "system";
 
 const STORAGE_KEY = "hyfleet:color-mode";
 const THEME_COLORS: Record<ColorMode, string> = {
-  light: "#ffffff",
-  dark: "#0a0a0a",
+  light: "#f4f7fb",
+  dark: "#0b1220",
   eye: "#f3f6f1",
 };
 

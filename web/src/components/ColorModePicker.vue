@@ -11,8 +11,8 @@ import {
 const open = ref(false);
 const options: Array<{ value: ColorModePreference; label: string; description: string }> = [
   { value: "system", label: "跟随系统", description: "随设备外观自动切换" },
-  { value: "light", label: "明亮", description: "纯白高对比界面" },
-  { value: "dark", label: "黑暗", description: "纯黑低光界面" },
+  { value: "light", label: "明亮", description: "灰白高对比界面" },
+  { value: "dark", label: "深色", description: "蓝灰低光控制台" },
   { value: "eye", label: "护眼", description: "柔和灰绿低对比界面" },
 ];
 const activeOption = computed(() =>
@@ -21,6 +21,7 @@ const activeOption = computed(() =>
 
 function select(preference: ColorModePreference) {
   setColorMode(preference);
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   open.value = false;
 }
 </script>

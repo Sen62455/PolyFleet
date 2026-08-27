@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Sen62455/PolyFleet/internal/protocol"
 	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
@@ -16,6 +18,8 @@ func TestUnifiedSubscriptionAPIAndCredentialRotation(t *testing.T) {
 	app := newTestApp(t)
 	app.bootstrap(t)
 	publicKeyPin := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x42}, 32))
+	userExpiry := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(time.Second)
+	const trafficLimit = int64(100 * 1024 * 1024 * 1024)
 
 	createdNode := app.request(t, http.MethodPost, "/api/v1/nodes", map[string]any{
 		"name": "subscription-node", "provider": "Test", "region": "Tokyo",
@@ -35,6 +39,7 @@ func TestUnifiedSubscriptionAPIAndCredentialRotation(t *testing.T) {
 
 	createdUser := app.request(t, http.MethodPost, "/api/v1/users", map[string]any{
 		"username": "subscription-user", "enabled": true, "node_ids": []string{node.ID},
+		"traffic_limit_bytes": trafficLimit, "expires_at": userExpiry,
 	}, app.csrf, "http://hyfleet.test")
 	requireStatus(t, createdUser, http.StatusCreated)
 	var userPayload struct {
@@ -44,6 +49,18 @@ func TestUnifiedSubscriptionAPIAndCredentialRotation(t *testing.T) {
 	decodeResponse(t, createdUser, &userPayload)
 	firstCredential := userPayload.Credentials[0].Credential
 	ackServerNode(t, app.store, node.ID, time.Now().UTC())
+	traffic, err := app.store.IngestTrafficBatch(t.Context(), store.AgentIdentity{
+		NodeID: node.ID, InstallationID: "subscription-test-installation",
+	}, protocol.TrafficBatch{
+		ID: "subscription-test-traffic", InstallationID: "subscription-test-installation",
+		SourceEpoch: "subscription-test-epoch", Sequence: 1, SampledAt: time.Now().UTC(),
+		Items: []protocol.TrafficDelta{{
+			UserID: userPayload.User.ID, UploadBytes: 1234, DownloadBytes: 5678,
+		}},
+	}, time.Now().UTC())
+	if err != nil || traffic.Status != "accepted" {
+		t.Fatalf("IngestTrafficBatch() = %#v, error = %v", traffic, err)
+	}
 
 	withoutCSRF := app.request(t, http.MethodPost,
 		"/api/v1/users/"+userPayload.User.ID+"/subscription-tokens", map[string]any{
@@ -80,6 +97,14 @@ func TestUnifiedSubscriptionAPIAndCredentialRotation(t *testing.T) {
 		uriResponse.Header().Get("Pragma") != "no-cache" {
 		t.Fatalf("subscription cache headers = %q, %q",
 			uriResponse.Header().Get("Cache-Control"), uriResponse.Header().Get("Pragma"))
+	}
+	wantUserinfo := "upload=1234; download=5678; total=" +
+		strconv.FormatInt(trafficLimit, 10) + "; expire=" + strconv.FormatInt(userExpiry.Unix(), 10)
+	if uriResponse.Header().Get("Subscription-Userinfo") != wantUserinfo ||
+		uriResponse.Header().Get("Profile-Update-Interval") != "6" ||
+		uriResponse.Header().Get("Profile-Web-Page-Url") != "http://hyfleet.test" ||
+		uriResponse.Header().Get("Content-Disposition") != `attachment; filename="PolyFleet-uri.txt"` {
+		t.Fatalf("subscription metadata headers = %#v", uriResponse.Header())
 	}
 	parsedURI, err := url.Parse(uriResponse.Body.String())
 	if err != nil || parsedURI.User.Username() != firstCredential || parsedURI.Hostname() != "hy2.example.com" {

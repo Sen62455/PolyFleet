@@ -40,9 +40,20 @@ Token、筛选与渲染器进入同一订阅；只读导入仍不会进入订阅
 | Clash Meta | `/sub/{token}/clash` |
 | sing-box | `/sub/{token}/sing-box` |
 
-Base64 的原文是以换行分隔的 Hysteria2 URI。Clash Meta 输出顶层
-`proxies`、`HyFleet` 选择组和兜底 `MATCH,HyFleet` 规则，因此导入完整
-配置后规则模式也会使用所选节点；sing-box 输出顶层 `outbounds`。字段分别遵循
+Base64 的原文是以换行分隔的代理 URI。Mihomo/Clash 输出可直接导入的完整配置：
+
+- `PolyFleet` 手动选择组、`自动选择` 延迟测试组和 `DIRECT` 兜底；
+- Hysteria2 与 VLESS/TCP/Reality 均显式启用 UDP，VLESS 使用 `xudp` packet encoding；
+- fake-IP DNS、域名嗅探和默认关闭的 TUN 基线；
+- 内置私网及常用国内域名直连规则，其他流量由 `MATCH,PolyFleet` 接管。
+
+默认规则不引用 `GEOSITE`、`GEOIP` 或远程 rule provider，因此全新的 Mihomo 数据目录不需要
+先从 GitHub 下载规则数据库才能加载订阅。内置国内域名是可靠启动基线，不是完整的中国大陆
+分流库；未命中的域名优先走代理。需要代理系统代理无法接管的应用、QUIC、游戏或虚拟网卡
+流量时，在 Clash Verge 中开启全局 TUN。订阅文件保留 `tun.enable: false`，避免导入后在没有
+管理员权限的设备上静默改变网络栈。
+
+sing-box 输出顶层 `outbounds`。字段分别遵循
 [Hysteria2 URI Scheme](https://v2.hysteria.network/docs/developers/URI-Scheme/)、
 [Mihomo Hysteria2](https://wiki.metacubex.one/en/config/proxies/hysteria2/) 和
 [sing-box Hysteria2 outbound](https://sing-box.sagernet.org/configuration/outbound/hysteria2/)。
@@ -56,6 +67,12 @@ Base64 的原文是以换行分隔的 Hysteria2 URI。Clash Meta 输出顶层
 所有订阅响应包含 `Cache-Control: no-store`。访问日志把完整路径改写为
 `/sub/[redacted]/格式`，不会记录 Token。数据库只保存 Token 的 SHA-256
 和短前缀；关闭一次性对话框后无法恢复旧地址，只能轮换 Token。
+
+Mihomo/Clash 响应同时返回 `Subscription-Userinfo`、`Profile-Update-Interval` 和
+`Profile-Web-Page-Url`。客户端可据此显示上传、下载、总额度、剩余流量与到期时间。
+`upload` 与 `download` 都参与额度计算；用户额度为 `0` 时响应中的 `total=0`，表示不限额，
+客户端会显示“无限”而不是一个剩余数值。要验收剩余流量显示，应先在用户页设置非零全局
+流量额度，再刷新订阅。
 
 ## 两种轮换
 

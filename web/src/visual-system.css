@@ -1,31 +1,31 @@
 :root,
 html[data-theme="light"] {
   color-scheme: light;
-  --hf-canvas: #ffffff;
+  --hf-canvas: #f4f7fb;
   --hf-surface: #ffffff;
-  --hf-surface-muted: #f7f7f7;
+  --hf-surface-muted: #f8fafc;
   --hf-surface-raised: #ffffff;
-  --hf-ink: #171717;
-  --hf-ink-soft: #333333;
-  --hf-muted: #737373;
-  --hf-subtle: #a3a3a3;
-  --hf-line: #eaeaea;
-  --hf-line-strong: #d4d4d4;
-  --hf-accent: #334155;
-  --hf-accent-hover: #1f2937;
+  --hf-ink: #0f172a;
+  --hf-ink-soft: #334155;
+  --hf-muted: #64748b;
+  --hf-subtle: #94a3b8;
+  --hf-line: #e2e8f0;
+  --hf-line-strong: #cbd5e1;
+  --hf-accent: #0f766e;
+  --hf-accent-hover: #0d9488;
   --hf-accent-contrast: #ffffff;
-  --hf-signal: #5f7f78;
-  --hf-signal-deep: #49655f;
-  --hf-flow: #64748b;
-  --hf-pressure: #9a6b32;
-  --hf-critical: #a34a4a;
-  --hf-warning-bg: #fffbf2;
-  --hf-danger-bg: #fff7f7;
-  --hf-hover: #f7f7f7;
-  --hf-selection: #e2e8f0;
-  --hf-shadow-hover: 0 10px 26px rgba(0, 0, 0, 0.055);
-  --hf-chart-primary: #334155;
-  --hf-chart-secondary: #718b86;
+  --hf-signal: #15803d;
+  --hf-signal-deep: #166534;
+  --hf-flow: #2563eb;
+  --hf-pressure: #d97706;
+  --hf-critical: #e11d48;
+  --hf-warning-bg: #fffbeb;
+  --hf-danger-bg: #fff1f2;
+  --hf-hover: #f1f5f9;
+  --hf-selection: #ccfbf1;
+  --hf-shadow-hover: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --hf-chart-primary: #0f766e;
+  --hf-chart-secondary: #2563eb;
   --hf-chart-tertiary: #9ca3af;
   --hf-display: Inter, "SF Pro Display", "Segoe UI Variable Display", "PingFang SC", "Microsoft YaHei", sans-serif;
   --hf-body: Inter, "SF Pro Text", "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -34,32 +34,32 @@ html[data-theme="light"] {
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --hf-canvas: #0a0a0a;
-  --hf-surface: #0a0a0a;
-  --hf-surface-muted: #111111;
-  --hf-surface-raised: #141414;
-  --hf-ink: #ededed;
-  --hf-ink-soft: #d4d4d4;
-  --hf-muted: #a1a1aa;
-  --hf-subtle: #737373;
-  --hf-line: #2a2a2a;
-  --hf-line-strong: #3a3a3a;
-  --hf-accent: #cbd5e1;
-  --hf-accent-hover: #e2e8f0;
-  --hf-accent-contrast: #111111;
-  --hf-signal: #78958f;
-  --hf-signal-deep: #8fa8a3;
-  --hf-flow: #94a3b8;
-  --hf-pressure: #b08a58;
-  --hf-critical: #c87979;
-  --hf-warning-bg: #19160f;
-  --hf-danger-bg: #1a1010;
-  --hf-hover: #151515;
-  --hf-selection: #334155;
-  --hf-shadow-hover: none;
-  --hf-chart-primary: #cbd5e1;
-  --hf-chart-secondary: #78958f;
-  --hf-chart-tertiary: #737373;
+  --hf-canvas: #0b1220;
+  --hf-surface: #111c2f;
+  --hf-surface-muted: #0e192b;
+  --hf-surface-raised: #16243a;
+  --hf-ink: #f8fafc;
+  --hf-ink-soft: #cbd5e1;
+  --hf-muted: #8fa1b8;
+  --hf-subtle: #64748b;
+  --hf-line: #223149;
+  --hf-line-strong: #33445d;
+  --hf-accent: #2dd4bf;
+  --hf-accent-hover: #5eead4;
+  --hf-accent-contrast: #042f2e;
+  --hf-signal: #34d399;
+  --hf-signal-deep: #6ee7b7;
+  --hf-flow: #60a5fa;
+  --hf-pressure: #fbbf24;
+  --hf-critical: #fb7185;
+  --hf-warning-bg: #221b0c;
+  --hf-danger-bg: #281219;
+  --hf-hover: #17263d;
+  --hf-selection: #123b3d;
+  --hf-shadow-hover: 0 14px 36px rgba(0, 0, 0, 0.24);
+  --hf-chart-primary: #2dd4bf;
+  --hf-chart-secondary: #60a5fa;
+  --hf-chart-tertiary: #a78bfa;
 }
 
 html[data-theme="eye"] {
@@ -815,21 +815,21 @@ body {
   background: var(--hf-subtle);
 }
 
-/* Agent to core to configuration rail */
+/* Control-plane to public-endpoint rail */
 
 .node-signal-rail {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .node-signal-rail__stage {
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: 9px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   padding-right: 12px;
 }
 
@@ -838,7 +838,7 @@ body {
   z-index: 0;
   top: 50%;
   right: -1px;
-  left: 4px;
+  left: 12px;
   height: 1px;
   background: var(--hf-line-strong);
   content: "";
@@ -847,13 +847,15 @@ body {
 .node-signal-rail__stage > i {
   position: relative;
   z-index: 1;
-  display: block;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--hf-surface);
-  border-radius: 50%;
-  background: var(--hf-subtle);
-  box-shadow: 0 0 0 1px var(--hf-line-strong);
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--hf-line-strong);
+  border-radius: 5px;
+  background: var(--hf-surface);
+  box-shadow: none;
+  color: var(--hf-subtle);
 }
 
 .node-signal-rail__stage > span {
@@ -886,22 +888,28 @@ body {
 }
 
 .node-signal-rail__stage--ok > i {
-  background: var(--hf-signal);
-  box-shadow: 0 0 0 1px var(--hf-signal);
+  border-color: rgba(52, 211, 153, 0.6);
+  background: rgba(52, 211, 153, 0.08);
+  box-shadow: none;
+  color: var(--hf-signal);
 }
 
 .node-signal-rail__stage--warn > i {
-  background: var(--hf-pressure);
-  box-shadow: 0 0 0 1px var(--hf-pressure);
+  border-color: rgba(251, 191, 36, 0.6);
+  background: rgba(251, 191, 36, 0.08);
+  box-shadow: none;
+  color: var(--hf-pressure);
 }
 
 .node-signal-rail__stage--down > i {
-  background: var(--hf-critical);
-  box-shadow: 0 0 0 1px var(--hf-critical);
+  border-color: rgba(251, 113, 133, 0.6);
+  background: rgba(251, 113, 133, 0.08);
+  box-shadow: none;
+  color: var(--hf-critical);
 }
 
 .node-signal-rail__stage--idle > i {
-  background: var(--hf-subtle);
+  color: var(--hf-subtle);
 }
 
 .node-signal-rail--compact {
@@ -1315,7 +1323,7 @@ body {
 
 .detail-band,
 .node-detail-column > .detail-section {
-  padding: 20px 0;
+  padding: 20px;
   border: 0;
   border-top: 1px solid var(--hf-line-strong);
   border-bottom: 1px solid var(--hf-line);
@@ -1342,6 +1350,9 @@ body {
 }
 
 .detail-list dd {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--hf-ink-soft);
   font-family: var(--hf-data);
 }
@@ -2047,6 +2058,26 @@ body {
     flex: 1;
   }
 
+  .node-detail-header > .node-signal-rail {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .node-detail-header .node-signal-rail__stage {
+    grid-template-columns: 24px minmax(0, 1fr);
+    min-height: 34px;
+    padding-right: 0;
+  }
+
+  .node-detail-header .node-signal-rail__stage:not(:last-child)::after {
+    top: calc(100% - 3px);
+    right: auto;
+    bottom: auto;
+    left: 12px;
+    width: 1px;
+    height: 17px;
+  }
+
   .host-kpis {
     grid-template-columns: 1fr 1fr;
     margin-bottom: 27px;
@@ -2138,8 +2169,8 @@ body {
   }
 
   .node-signal-rail__stage {
-    grid-template-columns: 8px minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
     padding-right: 2px;
   }
 

@@ -15,15 +15,16 @@ import (
 )
 
 type App struct {
-	config        config.Server
-	store         *store.Store
-	masterKey     []byte
-	logger        *slog.Logger
-	publicOrigin  string
-	dummyHash     string
-	loginLimiter  *rateLimiter
-	enrollLimiter *rateLimiter
-	subLimiter    *rateLimiter
+	config         config.Server
+	store          *store.Store
+	masterKey      []byte
+	logger         *slog.Logger
+	publicOrigin   string
+	dummyHash      string
+	loginLimiter   *rateLimiter
+	enrollLimiter  *rateLimiter
+	subLimiter     *rateLimiter
+	notifierClient *http.Client
 }
 
 func New(cfg config.Server, database *store.Store, masterKey []byte, logger *slog.Logger) (*App, error) {
@@ -36,15 +37,16 @@ func New(cfg config.Server, database *store.Store, masterKey []byte, logger *slo
 		return nil, err
 	}
 	return &App{
-		config:        cfg,
-		store:         database,
-		masterKey:     masterKey,
-		logger:        logger,
-		publicOrigin:  strings.TrimSuffix(publicURL.Scheme+"://"+publicURL.Host, "/"),
-		dummyHash:     dummyHash,
-		loginLimiter:  newRateLimiter(8, 5*time.Minute),
-		enrollLimiter: newRateLimiter(20, 5*time.Minute),
-		subLimiter:    newRateLimiter(120, time.Minute),
+		config:         cfg,
+		store:          database,
+		masterKey:      masterKey,
+		logger:         logger,
+		publicOrigin:   strings.TrimSuffix(publicURL.Scheme+"://"+publicURL.Host, "/"),
+		dummyHash:      dummyHash,
+		loginLimiter:   newRateLimiter(8, 5*time.Minute),
+		enrollLimiter:  newRateLimiter(20, 5*time.Minute),
+		subLimiter:     newRateLimiter(120, time.Minute),
+		notifierClient: safeWebhookClient(),
 	}, nil
 }
 
@@ -70,11 +72,13 @@ func (a *App) Handler() (http.Handler, error) {
 			authenticated.Get("/auth/session", a.handleSession)
 			authenticated.Post("/auth/logout", a.handleLogout)
 			authenticated.Get("/nodes", a.handleListNodes)
+			authenticated.Post("/nodes/bulk", a.handleBulkNodes)
 			authenticated.Get("/operations", a.handleListOperations)
 			authenticated.Post("/nodes", a.handleCreateNode)
 			authenticated.Get("/nodes/{nodeID}", a.handleGetNode)
 			authenticated.Get("/nodes/{nodeID}/metrics", a.handleListNodeMetrics)
 			authenticated.Get("/nodes/{nodeID}/telemetry", a.handleGetNodeTelemetry)
+			authenticated.Put("/nodes/{nodeID}/asset", a.handleUpsertNodeAsset)
 			authenticated.Put("/nodes/{nodeID}", a.handleUpdateNode)
 			authenticated.Post("/nodes/{nodeID}/traffic-calibration", a.handleCalibrateNodeTraffic)
 			authenticated.Delete("/nodes/{nodeID}", a.handleArchiveNode)
@@ -127,6 +131,18 @@ func (a *App) Handler() (http.Handler, error) {
 			)
 			authenticated.Get("/alerts", a.handleListAlerts)
 			authenticated.Post("/alerts/{alertID}/acknowledge", a.handleAcknowledgeAlert)
+			authenticated.Get("/assets", a.handleListNodeAssets)
+			authenticated.Get("/subscriptions", a.handleListSubscriptionOperations)
+			authenticated.Patch("/subscriptions/{tokenID}", a.handlePatchSubscriptionOperation)
+			authenticated.Get("/reports/traffic", a.handleTrafficReport)
+			authenticated.Get("/settings/notifications", a.handleGetNotificationSettings)
+			authenticated.Put("/settings/notifications", a.handlePutNotificationSettings)
+			authenticated.Post("/notifiers/{notifierID}/test", a.handleTestNotifier)
+			authenticated.Put("/notifiers/{notifierID}/telegram-bot", a.handlePutTelegramBotAccess)
+			authenticated.Delete("/notifiers/{notifierID}", a.handleDeleteNotifier)
+			authenticated.Put("/reminder-rules", a.handlePutNotificationReminderRule)
+			authenticated.Post("/reminder-rules/{ruleID}/run", a.handleRunNotificationReminderRule)
+			authenticated.Delete("/reminder-rules/{ruleID}", a.handleDeleteNotificationReminderRule)
 		})
 	})
 	router.Route("/agent/v1", func(agent chi.Router) {

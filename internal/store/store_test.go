@@ -42,6 +42,18 @@ func TestOpenAppliesMigrationsAndSQLitePolicy(t *testing.T) {
 	if err := database.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrations); err != nil || migrations == 0 {
 		t.Fatalf("migration count = %d, error = %v", migrations, err)
 	}
+	var operationsLayer int
+	if err := database.DB().QueryRow(`
+		SELECT COUNT(*) FROM schema_migrations WHERE version = '0014_operations_layer.sql'
+	`).Scan(&operationsLayer); err != nil || operationsLayer != 1 {
+		t.Fatalf("operations layer migration count = %d, error = %v", operationsLayer, err)
+	}
+	var notificationAutomation int
+	if err := database.DB().QueryRow(`
+		SELECT COUNT(*) FROM schema_migrations WHERE version = '0015_notification_automation.sql'
+	`).Scan(&notificationAutomation); err != nil || notificationAutomation != 1 {
+		t.Fatalf("notification automation migration count = %d, error = %v", notificationAutomation, err)
+	}
 }
 
 func TestHeartbeatPoolSurvivesBusyReadConnection(t *testing.T) {

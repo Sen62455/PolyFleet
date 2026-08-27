@@ -59,8 +59,11 @@ describe("HostTelemetryPanel", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("显示 2 / 24 项");
+    expect(wrapper.text()).toContain("显示 1 / 2 项");
     expect(wrapper.text()).toContain("126%");
     expect(wrapper.text()).not.toContain("cpu-heavy200cpu.service100%");
+    expect(wrapper.findAll(".telemetry-table--services tbody tr")).toHaveLength(1);
+    expect(wrapper.text()).toContain("hysteria-server.service");
     let processRows = wrapper.findAll(".telemetry-table--processes tbody tr");
     expect(processRows[0].text()).toContain("cpu-heavy");
 

@@ -189,7 +189,7 @@ BandwagonHost 只更新 Agent。
 
 ## 已知边界
 
-- 告警目前只显示在控制台，没有邮件、Telegram 或 webhook 外发；
+- 告警已支持加密保存的 Telegram、Slack 和自定义 HTTPS Webhook 出站队列；邮件仍未实现；
 - 备份没有自动保留策略和远端下载，需由管理员在节点侧管理磁盘；
 - S-UI 在线数据库备份和恢复尚未实现；
 - BandwagonHost 用户、流量与统一订阅需要后续提供脱敏后的服务端 sing-box 配置、实际

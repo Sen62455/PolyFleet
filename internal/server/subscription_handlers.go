@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -193,16 +194,46 @@ func (a *App) handleSubscription(
 		a.writeError(response, request, http.StatusInternalServerError, "subscription_failed", "subscription could not be generated")
 		return
 	}
-	setSubscriptionResponseHeaders(response)
+	setSubscriptionResponseHeaders(response, subscription, format, a.publicOrigin)
 	response.Header().Set("Content-Type", rendered.ContentType)
 	response.WriteHeader(http.StatusOK)
 	_, _ = response.Write(rendered.Body)
 }
 
-func setSubscriptionResponseHeaders(response http.ResponseWriter) {
+func setSubscriptionResponseHeaders(
+	response http.ResponseWriter,
+	subscription store.Subscription,
+	format string,
+	publicOrigin string,
+) {
 	response.Header().Set("Cache-Control", "no-store, max-age=0")
 	response.Header().Set("Pragma", "no-cache")
 	response.Header().Set("Expires", "0")
+	response.Header().Set("Subscription-Userinfo", subscriptionUserinfo(subscription))
+	response.Header().Set("Profile-Update-Interval", "6")
+	response.Header().Set("Profile-Web-Page-Url", publicOrigin)
+	response.Header().Set("Content-Disposition", subscriptionContentDisposition(format))
+}
+
+func subscriptionUserinfo(subscription store.Subscription) string {
+	expiresAt := int64(0)
+	if subscription.ExpiresAt != nil {
+		expiresAt = subscription.ExpiresAt.Unix()
+	}
+	return "upload=" + strconv.FormatInt(subscription.TrafficUploadBytes, 10) +
+		"; download=" + strconv.FormatInt(subscription.TrafficDownloadBytes, 10) +
+		"; total=" + strconv.FormatInt(subscription.TrafficLimitBytes, 10) +
+		"; expire=" + strconv.FormatInt(expiresAt, 10)
+}
+
+func subscriptionContentDisposition(format string) string {
+	extension := map[string]string{
+		"uri": "txt", "base64": "txt", "clash": "yaml", "sing-box": "json",
+	}[format]
+	if extension == "" {
+		extension = "txt"
+	}
+	return `attachment; filename="PolyFleet-` + format + `.` + extension + `"`
 }
 
 func validateSubscriptionTokenRequest(input subscriptionTokenRequest, now time.Time) string {

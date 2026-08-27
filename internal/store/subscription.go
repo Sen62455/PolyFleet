@@ -61,9 +61,13 @@ type SubscriptionEndpoint struct {
 }
 
 type Subscription struct {
-	UserID    string
-	Username  string
-	Endpoints []SubscriptionEndpoint
+	UserID               string
+	Username             string
+	TrafficUploadBytes   int64
+	TrafficDownloadBytes int64
+	TrafficLimitBytes    int64
+	ExpiresAt            *time.Time
+	Endpoints            []SubscriptionEndpoint
 }
 
 func SupportedSubscriptionFormats() []string {
@@ -271,8 +275,12 @@ func (s *Store) ResolveSubscription(
 	}
 	defer func() { _ = tx.Rollback() }()
 	var tokenID, userID, username, allowedFormats string
+	var trafficUploadBytes, trafficDownloadBytes, trafficLimitBytes int64
+	var userExpiresAt, tokenExpiresAt sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		SELECT t.id, u.id, u.username, t.allowed_formats
+		SELECT t.id, u.id, u.username, t.allowed_formats,
+		       u.traffic_upload_bytes, u.traffic_download_bytes,
+		       u.traffic_limit_bytes, u.expires_at, t.expires_at
 		FROM subscription_tokens t
 		JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = ? AND t.revoked_at IS NULL
@@ -282,6 +290,8 @@ func (s *Store) ResolveSubscription(
 		  AND u.quota_state <> 'limited'
 	`, tokenHash, now.UnixMilli(), now.UnixMilli()).Scan(
 		&tokenID, &userID, &username, &allowedFormats,
+		&trafficUploadBytes, &trafficDownloadBytes, &trafficLimitBytes,
+		&userExpiresAt, &tokenExpiresAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Subscription{}, ErrUnauthorized
@@ -380,7 +390,30 @@ func (s *Store) ResolveSubscription(
 	if err := tx.Commit(); err != nil {
 		return Subscription{}, fmt.Errorf("commit resolved subscription: %w", err)
 	}
-	return Subscription{UserID: userID, Username: username, Endpoints: endpoints}, nil
+	return Subscription{
+		UserID:               userID,
+		Username:             username,
+		TrafficUploadBytes:   trafficUploadBytes,
+		TrafficDownloadBytes: trafficDownloadBytes,
+		TrafficLimitBytes:    trafficLimitBytes,
+		ExpiresAt:            earliestSubscriptionExpiry(userExpiresAt, tokenExpiresAt),
+		Endpoints:            endpoints,
+	}, nil
+}
+
+func earliestSubscriptionExpiry(values ...sql.NullInt64) *time.Time {
+	var earliest *time.Time
+	for _, value := range values {
+		if !value.Valid {
+			continue
+		}
+		candidate := unixTime(value.Int64)
+		if earliest == nil || candidate.Before(*earliest) {
+			copy := candidate
+			earliest = &copy
+		}
+	}
+	return earliest
 }
 
 func scanSubscriptionToken(row rowScanner) (SubscriptionToken, error) {

@@ -506,7 +506,7 @@ func assertMigration0011Recorded(t *testing.T, ctx context.Context, database *St
 	var migrationCount, realityMigrationCount int
 	if err := database.DB().QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM schema_migrations",
-	).Scan(&migrationCount); err != nil || migrationCount != 13 {
+	).Scan(&migrationCount); err != nil || migrationCount != 14 {
 		t.Fatalf("migration count = %d, error = %v", migrationCount, err)
 	}
 	if err := database.DB().QueryRowContext(ctx, `

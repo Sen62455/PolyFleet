@@ -466,3 +466,217 @@ export interface AlertRecord {
   created_at: string;
   updated_at: string;
 }
+
+export interface UserPage {
+  users: UserRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface NodeAssetRecord {
+  node_id: string;
+  node_name: string;
+  plan: string;
+  purchased_at: string | null;
+  expires_at: string | null;
+  renewal_cycle_months: number;
+  auto_renew: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NodeAssetInput {
+  plan: string;
+  purchased_at: string | null;
+  expires_at: string | null;
+  renewal_cycle_months: number;
+  auto_renew: boolean;
+  notes: string;
+}
+
+export type SubscriptionOperationStatus =
+  | "active"
+  | "expiring"
+  | "exhausted"
+  | "expired"
+  | "revoked"
+  | "disabled";
+
+export interface SubscriptionOperationRecord {
+  token_id: string;
+  user_id: string;
+  username: string;
+  display_name: string;
+  name: string;
+  token_prefix: string;
+  allowed_formats: SubscriptionFormat[];
+  status: SubscriptionOperationStatus;
+  token_expires_at: string | null;
+  user_expires_at: string | null;
+  last_used_at: string | null;
+  last_traffic_at: string | null;
+  revoked_at: string | null;
+  traffic_limit_bytes: number;
+  traffic_upload_bytes: number;
+  traffic_download_bytes: number;
+  traffic_used_bytes: number;
+  assignment_count: number;
+  online_nodes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionOperationPage {
+  subscriptions: SubscriptionOperationRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SubscriptionOperationPatch {
+  token_expires_at?: string | null;
+  user_expires_at?: string | null;
+  traffic_limit_bytes?: number;
+  revoke?: boolean;
+}
+
+export interface TrafficReportPoint {
+  bucket_at: string;
+  upload_bytes: number;
+  download_bytes: number;
+}
+
+export interface TrafficReportRank {
+  id: string;
+  name: string;
+  upload_bytes: number;
+  download_bytes: number;
+  total_bytes: number;
+}
+
+export interface TrafficReport {
+  range: "7d" | "30d";
+  from: string;
+  to: string;
+  upload_bytes: number;
+  download_bytes: number;
+  total_bytes: number;
+  previous_upload_bytes: number;
+  previous_download_bytes: number;
+  previous_total_bytes: number;
+  daily: TrafficReportPoint[];
+  previous_daily?: TrafficReportPoint[];
+  top_users: TrafficReportRank[];
+  top_nodes: TrafficReportRank[];
+}
+
+export type NotificationKind = "telegram" | "slack" | "webhook";
+export type NotificationEvent = "created" | "resolved";
+
+export interface NotificationNotifierRecord {
+  id: string;
+  name: string;
+  kind: NotificationKind;
+  enabled: boolean;
+  target_hint: string;
+  events: NotificationEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationNotifierInput {
+  id?: string;
+  name: string;
+  kind: NotificationKind;
+  enabled: boolean;
+  events: NotificationEvent[];
+  url?: string;
+  bot_token?: string;
+  chat_id?: string;
+}
+
+export interface NotificationDeliveryRecord {
+  id: string;
+  notifier_id: string;
+  notifier_name: string;
+  notifier_kind: NotificationKind;
+  alert_id: string;
+  event_type: NotificationEvent;
+  status: "queued" | "retry" | "delivered" | "failed";
+  attempt_count: number;
+  next_attempt_at: string;
+  last_error: string;
+  response_code: number;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export type NotificationReminderKind =
+  | "fleet_summary"
+  | "active_alerts"
+  | "asset_expiry"
+  | "traffic_usage";
+
+export interface NotificationReminderRuleRecord {
+  id: string;
+  name: string;
+  notifier_id: string;
+  notifier_name: string;
+  kind: NotificationReminderKind;
+  enabled: boolean;
+  interval_minutes: number;
+  lead_days: number;
+  threshold_percent: number;
+  node_ids: string[];
+  last_run_at: string | null;
+  last_success_at: string | null;
+  last_result: string;
+  last_error: string;
+  next_run_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationReminderRuleInput {
+  id?: string;
+  name: string;
+  notifier_id: string;
+  kind: NotificationReminderKind;
+  enabled: boolean;
+  interval_minutes: number;
+  lead_days: number;
+  threshold_percent: number;
+  node_ids: string[];
+}
+
+export interface TelegramBotAccessRecord {
+  notifier_id: string;
+  notifier_name: string;
+  enabled: boolean;
+  last_poll_at: string | null;
+  last_error: string;
+  updated_at: string;
+}
+
+export interface NotificationSettings {
+  notifiers: NotificationNotifierRecord[];
+  deliveries: NotificationDeliveryRecord[];
+  reminder_rules: NotificationReminderRuleRecord[];
+  telegram_bots: TelegramBotAccessRecord[];
+}
+
+export type BulkNodeAction =
+  | "probe_core"
+  | "restart_core"
+  | "backup_config"
+  | "tail_core_log"
+  | "retry_sync";
+
+export interface BulkNodeResult {
+  node_id: string;
+  status: "accepted" | "failed";
+  error?: string;
+  operation?: NodeOperationRecord;
+}

@@ -34,7 +34,7 @@ const telemetry = ref<NodeTelemetrySnapshot>(emptyTelemetry());
 const loading = ref(false);
 const errorMessage = ref("");
 const processSort = ref<ProcessSort>("cpu");
-const serviceFilter = ref<ServiceFilter>("all");
+const serviceFilter = ref<ServiceFilter>("running");
 const serviceSort = ref<ServiceSort>("name");
 const serviceQuery = ref("");
 const serviceSortOptions: { label: string; value: ServiceSort }[] = [
@@ -198,7 +198,7 @@ defineExpose({ refresh });
           <div>
             <h3 id="systemd-services-title">Systemd 服务</h3>
             <span>
-              显示 {{ telemetry.services.length }} / {{ telemetry.services_total || telemetry.services.length }} 项
+              显示 {{ filteredServices.length }} / {{ telemetry.services_total || telemetry.services.length }} 项
               <template v-if="telemetry.services_truncated"> · 已截取</template>
               · 失败 {{ failedServices }} 项
               · 数据 {{ relativeTime(telemetry.services_sampled_at ?? telemetry.sampled_at) }}

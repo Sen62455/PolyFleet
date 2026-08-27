@@ -161,7 +161,11 @@ func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, fmt.Errorf("close users: %w", err)
 	}
 
-	assignments, err := s.listAssignments(ctx, "")
+	userIDs := make([]string, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+	assignments, err := s.listAssignmentsForUsers(ctx, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +179,75 @@ func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
 		}
 	}
 	return users, nil
+}
+
+func (s *Store) ListUsersPage(
+	ctx context.Context,
+	search string,
+	limit, offset int,
+) ([]User, int, error) {
+	if limit < 1 || limit > 500 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	where := "archived_at IS NULL"
+	args := make([]any, 0, 4)
+	if search = strings.TrimSpace(search); search != "" {
+		where += ` AND (username LIKE ? ESCAPE '\' OR display_name LIKE ? ESCAPE '\' OR notes LIKE ? ESCAPE '\')`
+		pattern := "%" + escapeLike(search) + "%"
+		args = append(args, pattern, pattern, pattern)
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+	queryArgs := append(append([]any(nil), args...), limit, offset)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+userColumns+` FROM users WHERE `+where+`
+		ORDER BY username COLLATE NOCASE LIMIT ? OFFSET ?
+	`, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list user page: %w", err)
+	}
+	users := make([]User, 0, limit)
+	for rows.Next() {
+		user, err := scanUser(rows)
+		if err != nil {
+			_ = rows.Close()
+			return nil, 0, fmt.Errorf("scan user page: %w", err)
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, 0, fmt.Errorf("iterate user page: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, 0, fmt.Errorf("close user page: %w", err)
+	}
+	if len(users) == 0 {
+		return users, total, nil
+	}
+	userIDs := make([]string, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+	assignments, err := s.listAssignmentsForUsers(ctx, userIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	indexes := make(map[string]int, len(users))
+	for index := range users {
+		indexes[users[index].ID] = index
+	}
+	for _, assignment := range assignments {
+		if index, ok := indexes[assignment.UserID]; ok {
+			users[index].Assignments = append(users[index].Assignments, assignment)
+		}
+	}
+	return users, total, nil
 }
 
 func (s *Store) GetUser(ctx context.Context, id string) (User, error) {
@@ -242,6 +315,16 @@ func (s *Store) UpdateUser(ctx context.Context, id string, input UpdateUser) (Us
 		return User{}, fmt.Errorf("begin update user: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := updateUserTx(ctx, tx, id, input); err != nil {
+		return User{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return User{}, fmt.Errorf("commit update user: %w", err)
+	}
+	return s.GetUser(ctx, id)
+}
+
+func updateUserTx(ctx context.Context, tx *sql.Tx, id string, input UpdateUser) error {
 	var currentEnabled int
 	var currentExpiryEnforcedAt sql.NullInt64
 	var trafficUsed int64
@@ -252,17 +335,17 @@ func (s *Store) UpdateUser(ctx context.Context, id string, input UpdateUser) (Us
 		&currentEnabled, &currentExpiryEnforcedAt, &trafficUsed,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return User{}, ErrNotFound
+			return ErrNotFound
 		}
-		return User{}, fmt.Errorf("read current user state: %w", err)
+		return fmt.Errorf("read current user state: %w", err)
 	}
 	nodeIDs, err := assignmentNodeIDs(ctx, tx, id)
 	if err != nil {
-		return User{}, err
+		return err
 	}
 	beforeQuota, err := effectiveQuotaStatesTx(ctx, tx, []string{id})
 	if err != nil {
-		return User{}, err
+		return err
 	}
 	expiryValue := expiryEnforcedValue(input.ExpiresAt, input.Now)
 	if expiryValue != nil && currentExpiryEnforcedAt.Valid {
@@ -278,18 +361,18 @@ func (s *Store) UpdateUser(ctx context.Context, id string, input UpdateUser) (Us
 		quotaState(input.TrafficLimitBytes, trafficUsed), expiryValue,
 		input.Now.UnixMilli(), id)
 	if err != nil {
-		return User{}, fmt.Errorf("%w: update user: %v", ErrConflict, err)
+		return fmt.Errorf("%w: update user: %v", ErrConflict, err)
 	}
 	count, err := result.RowsAffected()
 	if err != nil {
-		return User{}, fmt.Errorf("read update user result: %w", err)
+		return fmt.Errorf("read update user result: %w", err)
 	}
 	if count == 0 {
-		return User{}, ErrNotFound
+		return ErrNotFound
 	}
 	afterQuota, err := effectiveQuotaStatesTx(ctx, tx, []string{id})
 	if err != nil {
-		return User{}, err
+		return err
 	}
 	disableKick := currentEnabled == 1 && !input.Enabled
 	expiredNow := input.ExpiresAt != nil && !input.Now.Before(input.ExpiresAt.UTC())
@@ -311,18 +394,15 @@ func (s *Store) UpdateUser(ctx context.Context, id string, input UpdateUser) (Us
 		}
 		if reason != "" {
 			if err := requestKickTx(ctx, tx, nodeID, id, reason, input.Now); err != nil {
-				return User{}, err
+				return err
 			}
 		}
 		addChangedAssignment(changed, nodeID, id)
 	}
 	if err := bumpChangedAssignmentsTx(ctx, tx, changed, input.Now); err != nil {
-		return User{}, err
+		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return User{}, fmt.Errorf("commit update user: %w", err)
-	}
-	return s.GetUser(ctx, id)
+	return nil
 }
 
 func (s *Store) UpdateAssignment(
@@ -952,6 +1032,13 @@ func createUserCredentialTx(
 }
 
 func (s *Store) listAssignments(ctx context.Context, userID string) ([]UserAssignment, error) {
+	if userID == "" {
+		return s.listAssignmentsForUsers(ctx, nil)
+	}
+	return s.listAssignmentsForUsers(ctx, []string{userID})
+}
+
+func (s *Store) listAssignmentsForUsers(ctx context.Context, userIDs []string) ([]UserAssignment, error) {
 	query := `
 		SELECT a.id, a.user_id, a.node_id, n.name, n.adapter_type, a.enabled,
 		       a.desired_credential_id, COALESCE(a.applied_credential_id, ''),
@@ -980,10 +1067,13 @@ func (s *Store) listAssignments(ctx context.Context, userID string) ([]UserAssig
 		LEFT JOIN node_kick_targets k ON k.node_id = a.node_id AND k.user_id = a.user_id
 		LEFT JOIN node_vless_reality r ON r.node_id = a.node_id
 	`
-	arguments := []any{}
-	if userID != "" {
-		query += " WHERE a.user_id = ?"
-		arguments = append(arguments, userID)
+	arguments := make([]any, 0, len(userIDs))
+	if len(userIDs) > 0 {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(userIDs)), ",")
+		query += " WHERE a.user_id IN (" + placeholders + ")"
+		for _, userID := range userIDs {
+			arguments = append(arguments, userID)
+		}
 	}
 	query += " ORDER BY n.name COLLATE NOCASE"
 	rows, err := s.db.QueryContext(ctx, query, arguments...)

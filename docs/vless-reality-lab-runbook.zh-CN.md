@@ -14,6 +14,12 @@ HyFleet 稳定产品范围，不能把本手册当作生产部署或稳定升级
 socket 或带 `-lab` 后缀的服务。已经注册过其他 adapter 的标准 Agent 不能
 原地切换为 Reality；请使用尚未注册 HyFleet Agent 的测试主机。
 
+同一 Reality core、配置路径和 identity 不能同时交给两个控制面。Agent 的
+`server_url` 指向生产控制面时，实验控制面显示“未连接”是所有权隔离的预期结果，不是
+心跳故障。不要为了让两个面板同时在线而复制 credentials、Agent 数据库或 systemd unit；
+需要并行实验时应使用另一台 VPS，或使用完全隔离的第二个 sing-box 实例、配置、端口、
+identity、Agent 状态目录和 helper socket。
+
 ## 固定实验契约
 
 Reality adapter 的可执行边界不能通过安装参数调整：

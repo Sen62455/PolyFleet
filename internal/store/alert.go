@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,43 +58,79 @@ func scanAlert(row rowScanner) (Alert, error) {
 	return alert, nil
 }
 
+type AlertFilter struct {
+	Status string
+	NodeID string
+	Type   string
+	Limit  int
+	Offset int
+}
+
 func (s *Store) ListAlerts(ctx context.Context, status string, limit int) ([]Alert, error) {
-	if limit < 1 || limit > 200 {
-		limit = 100
+	alerts, _, err := s.ListAlertsPage(ctx, AlertFilter{Status: status, Limit: limit})
+	return alerts, err
+}
+
+func (s *Store) ListAlertsPage(
+	ctx context.Context,
+	filter AlertFilter,
+) ([]Alert, int, error) {
+	if filter.Limit < 1 || filter.Limit > 200 {
+		filter.Limit = 100
 	}
-	where := "a.resolved_at IS NULL"
-	switch status {
+	if filter.Offset < 0 {
+		filter.Offset = 0
+	}
+	where := []string{"n.archived_at IS NULL"}
+	args := make([]any, 0, 6)
+	switch strings.TrimSpace(filter.Status) {
 	case "", "active":
+		where = append(where, "a.resolved_at IS NULL")
 	case "resolved":
-		where = "a.resolved_at IS NOT NULL"
+		where = append(where, "a.resolved_at IS NOT NULL")
 	case "all":
-		where = "1 = 1"
 	default:
-		return nil, ErrUnsupported
+		return nil, 0, ErrUnsupported
 	}
+	if filter.NodeID != "" {
+		where = append(where, "a.node_id = ?")
+		args = append(args, filter.NodeID)
+	}
+	if filter.Type != "" {
+		where = append(where, "a.type = ?")
+		args = append(args, filter.Type)
+	}
+	whereSQL := strings.Join(where, " AND ")
+	var total int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM alerts a JOIN nodes n ON n.id = a.node_id
+		WHERE `+whereSQL, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count alerts: %w", err)
+	}
+	queryArgs := append(append([]any(nil), args...), filter.Limit, filter.Offset)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+alertColumns+`
 		FROM alerts a JOIN nodes n ON n.id = a.node_id
-		WHERE `+where+` AND n.archived_at IS NULL
+		WHERE `+whereSQL+`
 		ORDER BY CASE a.severity WHEN 'critical' THEN 0 ELSE 1 END,
-		         a.last_seen_at DESC LIMIT ?
-	`, limit)
+		         a.last_seen_at DESC LIMIT ? OFFSET ?
+	`, queryArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("list alerts: %w", err)
+		return nil, 0, fmt.Errorf("list alerts: %w", err)
 	}
 	defer rows.Close()
 	alerts := make([]Alert, 0)
 	for rows.Next() {
 		alert, err := scanAlert(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan alert: %w", err)
+			return nil, 0, fmt.Errorf("scan alert: %w", err)
 		}
 		alerts = append(alerts, alert)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate alerts: %w", err)
+		return nil, 0, fmt.Errorf("iterate alerts: %w", err)
 	}
-	return alerts, nil
+	return alerts, total, nil
 }
 
 func (s *Store) AcknowledgeAlert(
@@ -308,31 +346,99 @@ func upsertAlertTx(
 	if len(message) > 512 {
 		message = message[:512]
 	}
+	var existingID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id FROM alerts WHERE node_id = ? AND type = ? AND resolved_at IS NULL
+	`, nodeID, alertType).Scan(&existingID)
+	if err == nil {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE alerts SET severity = ?, message = ?, last_seen_at = ?, updated_at = ?
+			WHERE id = ?
+		`, severity, message, now.UnixMilli(), now.UnixMilli(), existingID); err != nil {
+			return fmt.Errorf("update alert: %w", err)
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("find active alert: %w", err)
+	}
+	alertID := uuid.NewString()
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO alerts(
 			id, node_id, type, severity, status, message,
 			first_seen_at, last_seen_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)
-		ON CONFLICT(node_id, type) WHERE resolved_at IS NULL DO UPDATE SET
-			severity = excluded.severity,
-			message = excluded.message,
-			last_seen_at = excluded.last_seen_at,
-			updated_at = excluded.updated_at
-	`, uuid.NewString(), nodeID, alertType, severity, message, now.UnixMilli(),
+	`, alertID, nodeID, alertType, severity, message, now.UnixMilli(),
 		now.UnixMilli(), now.UnixMilli(), now.UnixMilli()); err != nil {
-		return fmt.Errorf("upsert alert: %w", err)
+		return fmt.Errorf("insert alert: %w", err)
 	}
-	return nil
+	payload, err := alertNotificationJSON(ctx, tx, alertID, "created", now)
+	if err != nil {
+		return err
+	}
+	return enqueueAlertNotificationTx(ctx, tx, alertID, "created", payload, now)
 }
 
 func resolveAlertTx(ctx context.Context, tx *sql.Tx, nodeID, alertType string, now time.Time) error {
+	var alertID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id FROM alerts WHERE node_id = ? AND type = ? AND resolved_at IS NULL
+	`, nodeID, alertType).Scan(&alertID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("find resolving alert: %w", err)
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE alerts SET status = 'resolved', resolved_at = ?, updated_at = ?
-		WHERE node_id = ? AND type = ? AND resolved_at IS NULL
-	`, now.UnixMilli(), now.UnixMilli(), nodeID, alertType); err != nil {
+		WHERE id = ? AND resolved_at IS NULL
+	`, now.UnixMilli(), now.UnixMilli(), alertID); err != nil {
 		return fmt.Errorf("resolve alert: %w", err)
 	}
-	return nil
+	payload, err := alertNotificationJSON(ctx, tx, alertID, "resolved", now)
+	if err != nil {
+		return err
+	}
+	return enqueueAlertNotificationTx(ctx, tx, alertID, "resolved", payload, now)
+}
+
+type alertNotificationPayload struct {
+	Event      string    `json:"event"`
+	AlertID    string    `json:"alert_id"`
+	NodeID     string    `json:"node_id"`
+	NodeName   string    `json:"node_name"`
+	Type       string    `json:"type"`
+	Severity   string    `json:"severity"`
+	Status     string    `json:"status"`
+	Message    string    `json:"message"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func alertNotificationJSON(
+	ctx context.Context,
+	tx *sql.Tx,
+	alertID, event string,
+	now time.Time,
+) (string, error) {
+	var payload alertNotificationPayload
+	payload.Event = event
+	payload.AlertID = alertID
+	payload.OccurredAt = now
+	if err := tx.QueryRowContext(ctx, `
+		SELECT a.node_id, n.name, a.type, a.severity, a.status, a.message
+		FROM alerts a JOIN nodes n ON n.id = a.node_id WHERE a.id = ?
+	`, alertID).Scan(
+		&payload.NodeID, &payload.NodeName, &payload.Type, &payload.Severity,
+		&payload.Status, &payload.Message,
+	); err != nil {
+		return "", fmt.Errorf("read alert notification payload: %w", err)
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("encode alert notification payload: %w", err)
+	}
+	return string(encoded), nil
 }
 
 func (s *Store) GetAlert(ctx context.Context, alertID string) (Alert, error) {

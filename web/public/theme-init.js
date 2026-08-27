@@ -31,6 +31,6 @@
   var themeColor = document.querySelector('meta[name="theme-color"]');
   if (colorScheme) colorScheme.setAttribute("content", mode === "dark" ? "dark" : "light");
   if (themeColor) {
-    themeColor.setAttribute("content", mode === "dark" ? "#0a0a0a" : mode === "eye" ? "#f3f6f1" : "#ffffff");
+    themeColor.setAttribute("content", mode === "dark" ? "#0b1220" : mode === "eye" ? "#f3f6f1" : "#f4f7fb");
   }
 })();

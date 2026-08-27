@@ -99,7 +99,7 @@ func main() {
 	}
 	shutdownContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go runMaintenance(shutdownContext, database, logger, cfg.OfflineAfter)
+	go runMaintenance(shutdownContext, database, application, logger, cfg.OfflineAfter)
 	go func() {
 		<-shutdownContext.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -118,6 +118,7 @@ func main() {
 func runMaintenance(
 	ctx context.Context,
 	database *store.Store,
+	application *server.App,
 	logger *slog.Logger,
 	offlineAfter time.Duration,
 ) {
@@ -140,6 +141,24 @@ func runMaintenance(
 		cancelAlerts()
 		if err != nil && ctx.Err() == nil {
 			logger.Error("reconcile alerts failed", "error", err)
+		}
+		notificationContext, cancelNotifications := context.WithTimeout(ctx, 20*time.Second)
+		err = application.DispatchNotifications(notificationContext, 20)
+		cancelNotifications()
+		if err != nil && ctx.Err() == nil {
+			logger.Warn("dispatch alert notifications failed", "error", err)
+		}
+		reminderContext, cancelReminders := context.WithTimeout(ctx, 20*time.Second)
+		err = application.DispatchNotificationReminders(reminderContext, 20)
+		cancelReminders()
+		if err != nil && ctx.Err() == nil {
+			logger.Warn("dispatch reminder notifications failed", "error", err)
+		}
+		botContext, cancelBot := context.WithTimeout(ctx, 20*time.Second)
+		err = application.PollTelegramBots(botContext, 25)
+		cancelBot()
+		if err != nil && ctx.Err() == nil {
+			logger.Warn("poll Telegram bot commands failed", "error", err)
 		}
 		pruneContext, cancelPrune := context.WithTimeout(ctx, 10*time.Second)
 		_, err = database.PruneNodeMetricSamples(pruneContext, now.Add(-30*24*time.Hour), 5000)

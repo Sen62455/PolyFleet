@@ -89,6 +89,7 @@ try {
     try {
         $serverBuildArguments = @(
             "build",
+            "-buildvcs=false",
             "-tags=webui",
             "-ldflags=$ldflags",
             "-o=$(Join-Path $binaryOutput 'hyfleet-server')",
@@ -98,6 +99,7 @@ try {
 
         $agentBuildArguments = @(
             "build",
+            "-buildvcs=false",
             "-ldflags=$ldflags",
             "-o=$(Join-Path $binaryOutput 'hyfleet-agent')",
             "./cmd/agent"
@@ -106,6 +108,7 @@ try {
 
         $opsBuildArguments = @(
             "build",
+            "-buildvcs=false",
             "-ldflags=$ldflags",
             "-o=$(Join-Path $binaryOutput 'hyfleet-agent-ops')",
             "./cmd/agentops"
@@ -199,6 +202,7 @@ foreach ($documentName in @(
     "15-phase-6-operations.md",
     "16-phase-7-public-release.md",
     "17-native-convergence-and-monitoring.md",
+    "18-operations-layer.zh-CN.md",
     "compatibility.md",
     "quick-start.zh-CN.md",
     "migration-from-hyfleet.zh-CN.md",
@@ -265,6 +269,7 @@ $checksumLines = Get-ChildItem -Path $bundlePath -Recurse -File |
 $packageScript = Join-Path (Join-Path $repositoryRoot "scripts") "package-release.go"
 $packageArguments = @(
     "run",
+    "-buildvcs=false",
     $packageScript,
     "-source", $bundlePath,
     "-output", $archivePath,

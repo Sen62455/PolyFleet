@@ -187,7 +187,14 @@ func (a *App) handleListAlerts(response http.ResponseWriter, request *http.Reque
 	}
 	status := strings.TrimSpace(request.URL.Query().Get("status"))
 	limit := boundedQueryLimit(request.URL.Query().Get("limit"), 100, 200)
-	alerts, err := a.store.ListAlerts(request.Context(), status, limit)
+	offset := queryOffset(request.URL.Query().Get("offset"))
+	alerts, total, err := a.store.ListAlertsPage(request.Context(), store.AlertFilter{
+		Status: status,
+		NodeID: strings.TrimSpace(request.URL.Query().Get("node_id")),
+		Type:   strings.TrimSpace(request.URL.Query().Get("type")),
+		Limit:  limit,
+		Offset: offset,
+	})
 	if errors.Is(err, store.ErrUnsupported) {
 		a.writeError(response, request, http.StatusUnprocessableEntity, "validation_failed", "status must be active, resolved, or all")
 		return
@@ -201,7 +208,9 @@ func (a *App) handleListAlerts(response http.ResponseWriter, request *http.Reque
 	for _, alert := range alerts {
 		result = append(result, presentAlert(alert))
 	}
-	writeJSON(response, http.StatusOK, map[string]any{"alerts": result})
+	writeJSON(response, http.StatusOK, map[string]any{
+		"alerts": result, "total": total, "limit": limit, "offset": offset,
+	})
 }
 
 func (a *App) handleAcknowledgeAlert(response http.ResponseWriter, request *http.Request) {

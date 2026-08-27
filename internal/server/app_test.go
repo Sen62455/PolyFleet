@@ -23,11 +23,12 @@ import (
 const testPassword = "correct horse battery staple"
 
 type testApp struct {
-	handler http.Handler
-	store   *store.Store
-	cookie  *http.Cookie
-	csrf    string
-	logs    *bytes.Buffer
+	application *App
+	handler     http.Handler
+	store       *store.Store
+	cookie      *http.Cookie
+	csrf        string
+	logs        *bytes.Buffer
 }
 
 func newTestApp(t *testing.T) *testApp {
@@ -54,7 +55,7 @@ func newTestApp(t *testing.T) *testApp {
 	if err != nil {
 		t.Fatalf("Handler() error = %v", err)
 	}
-	return &testApp{handler: handler, store: database, logs: logs}
+	return &testApp{application: application, handler: handler, store: database, logs: logs}
 }
 
 func (app *testApp) request(t *testing.T, method, path string, body any, csrf, origin string) *httptest.ResponseRecorder {

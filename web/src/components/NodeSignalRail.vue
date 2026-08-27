@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { CloudCog, Cpu, Globe2, RadioTower } from "@lucide/vue";
 import { statusLabels } from "../lib/format";
 import type { NodeRecord } from "../types";
 
@@ -17,26 +18,36 @@ const stages = computed(() => {
         : "down";
   const configurationApplied = props.node.desired_version > 0
     && props.node.applied_version >= props.node.desired_version;
+	const endpointReady = props.node.enabled && props.node.public_host !== "" && props.node.public_port > 0;
 
   return [
+		{
+			label: "Control",
+			value: props.node.desired_version <= 0
+				? "尚未下发"
+				: configurationApplied
+					? `配置 v${props.node.applied_version}`
+					: `等待 v${props.node.desired_version}`,
+			state: (props.node.desired_version <= 0 ? "idle" : configurationApplied ? "ok" : "warn") as SignalState,
+			icon: CloudCog,
+		},
     {
       label: "Agent",
       value: props.node.agent_version || statusLabels[props.node.status] || "未注册",
       state: agentState,
+			icon: RadioTower,
     },
     {
-      label: "核心",
+			label: "Core",
       value: props.node.core_running ? (props.node.core_name || "运行中") : "未运行",
       state: (props.node.core_running ? "ok" : "down") as SignalState,
+			icon: Cpu,
     },
     {
-      label: "配置",
-      value: props.node.desired_version <= 0
-        ? "尚未下发"
-        : configurationApplied
-          ? `已同步 v${props.node.applied_version}`
-          : `等待 v${props.node.desired_version}`,
-      state: (props.node.desired_version <= 0 ? "idle" : configurationApplied ? "ok" : "warn") as SignalState,
+			label: "Endpoint",
+			value: endpointReady ? `${props.node.public_host}:${props.node.public_port}` : "端点未设置",
+			state: (endpointReady && props.node.core_running ? "ok" : endpointReady ? "warn" : "idle") as SignalState,
+			icon: Globe2,
     },
   ];
 });
@@ -56,10 +67,10 @@ const stages = computed(() => {
       :class="`node-signal-rail__stage--${stage.state}`"
       role="listitem"
     >
-      <i aria-hidden="true" />
+			<i aria-hidden="true"><component :is="stage.icon" :size="15" :stroke-width="1.8" /></i>
       <span>
         <strong>{{ stage.label }}</strong>
-        <small>{{ stage.value }}</small>
+        <small :title="stage.value">{{ stage.value }}</small>
       </span>
     </div>
   </div>
