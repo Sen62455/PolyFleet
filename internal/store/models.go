@@ -17,6 +17,7 @@ var (
 	ErrReadOnly         = errors.New("read-only assignment")
 	ErrQuotaUnsupported = errors.New("quota unsupported")
 	ErrKickUnsupported  = errors.New("kick unsupported")
+	ErrNodeEnabled      = errors.New("node must be disabled")
 )
 
 func unixTime(value int64) time.Time {

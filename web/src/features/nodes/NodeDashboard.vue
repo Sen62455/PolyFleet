@@ -363,6 +363,35 @@ async function saveNode(input: Required<NodeInput>) {
   }
 }
 
+async function finishArchive(node: NodeRecord, force = false) {
+  await api.archiveNode(node.id, force);
+  if (detailNodeID.value === node.id) {
+    detailNodeID.value = null;
+    activeView.value = "nodes";
+  }
+  await loadNodes(true);
+  message.success(force ? "节点已强制归档" : "节点已归档");
+}
+
+function confirmForceArchive(node: NodeRecord) {
+  dialog.error({
+    title: "强制归档失联节点",
+    content: `“${node.name}”的 Agent 尚未确认用户清理。只有在该服务器已停用、且你确认它不再由 PolyFleet 管理时才应继续；数据面可能仍保留旧凭据。`,
+    positiveText: "确认强制归档",
+    negativeText: "取消",
+    positiveButtonProps: { type: "error" },
+    async onPositiveClick() {
+      try {
+        await finishArchive(node, true);
+      } catch (error) {
+        handleAPIError(error, "节点强制归档失败。 ");
+        return false;
+      }
+      return true;
+    },
+  });
+}
+
 function archiveNode(node: NodeRecord) {
   dialog.warning({
     title: "归档节点",
@@ -372,14 +401,16 @@ function archiveNode(node: NodeRecord) {
     positiveButtonProps: { type: "error" },
     async onPositiveClick() {
       try {
-        await api.archiveNode(node.id);
-				if (detailNodeID.value === node.id) {
-					detailNodeID.value = null;
-					activeView.value = "nodes";
-				}
-        await loadNodes(true);
-        message.success("节点已归档");
+        await finishArchive(node);
       } catch (error) {
+        if (error instanceof APIError && error.code === "node_pending_removals") {
+          if (node.enabled) {
+            message.warning("该节点仍有待确认清理，请先在编辑节点中停用，再决定是否强制归档。");
+            return false;
+          }
+          window.setTimeout(() => confirmForceArchive(node), 0);
+          return true;
+        }
         handleAPIError(error, "节点归档失败。 ");
         return false;
       }

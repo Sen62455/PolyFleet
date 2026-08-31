@@ -54,6 +54,12 @@ func TestOpenAppliesMigrationsAndSQLitePolicy(t *testing.T) {
 	`).Scan(&notificationAutomation); err != nil || notificationAutomation != 1 {
 		t.Fatalf("notification automation migration count = %d, error = %v", notificationAutomation, err)
 	}
+	var nodePing int
+	if err := database.DB().QueryRow(`
+		SELECT COUNT(*) FROM schema_migrations WHERE version = '0016_node_ping.sql'
+	`).Scan(&nodePing); err != nil || nodePing != 1 {
+		t.Fatalf("node ping migration count = %d, error = %v", nodePing, err)
+	}
 }
 
 func TestHeartbeatPoolSurvivesBusyReadConnection(t *testing.T) {

@@ -342,18 +342,32 @@ func (a *App) handleUpdateNode(response http.ResponseWriter, request *http.Reque
 }
 
 func (a *App) handleArchiveNode(response http.ResponseWriter, request *http.Request) {
-	err := a.store.ArchiveNode(request.Context(), chi.URLParam(request, "nodeID"), time.Now().UTC())
+	force := request.URL.Query().Get("force") == "true"
+	nodeID := chi.URLParam(request, "nodeID")
+	err := a.store.ArchiveNodeWithForce(request.Context(), nodeID, force, time.Now().UTC())
 	if errors.Is(err, store.ErrNotFound) {
 		a.writeError(response, request, http.StatusNotFound, "node_not_found", "node not found")
 		return
 	}
 	if errors.Is(err, store.ErrConflict) {
-		a.writeError(response, request, http.StatusConflict, "node_has_assignments", "remove active user assignments or wait for the agent to apply pending removals before archiving the node")
+		a.writeError(response, request, http.StatusConflict, "node_has_assignments", "remove active user assignments before archiving the node")
+		return
+	}
+	if errors.Is(err, store.ErrPending) {
+		a.writeError(response, request, http.StatusConflict, "node_pending_removals", "the node Agent has not confirmed pending removals; disable the node and force archive only if the server is no longer managed")
+		return
+	}
+	if errors.Is(err, store.ErrNodeEnabled) {
+		a.writeError(response, request, http.StatusConflict, "node_force_archive_requires_disabled", "disable the node before force archiving it")
 		return
 	}
 	if err != nil {
 		a.writeError(response, request, http.StatusInternalServerError, "node_archive_failed", "could not archive node")
 		return
+	}
+	if force {
+		session := sessionFromContext(request.Context())
+		a.logger.Warn("node force archived", "node_id", nodeID, "admin_id", session.AdminID)
 	}
 	response.WriteHeader(http.StatusNoContent)
 }

@@ -97,6 +97,26 @@ func TestRealityNodeOperationRejectsLogTail(t *testing.T) {
 	}
 }
 
+func TestPingOperationStoresCanonicalIPAddress(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	database, admin, node, identity := newOperationTestStore(t, "native_hysteria2", now)
+	if _, err := database.CreateTargetedNodeOperation(
+		t.Context(), node.ID, "ping", 0, "example.com", admin.ID, now,
+	); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("CreateTargetedNodeOperation(hostname) error = %v", err)
+	}
+	operation, err := database.CreateTargetedNodeOperation(
+		t.Context(), node.ID, "ping", 0, "2001:0db8:0:0::1", admin.ID, now,
+	)
+	if err != nil || operation.Target != "2001:db8::1" {
+		t.Fatalf("CreateTargetedNodeOperation() = %#v, error = %v", operation, err)
+	}
+	pending, err := database.ListPendingNodeOperations(t.Context(), identity, 0, now, 20)
+	if err != nil || len(pending) != 1 || pending[0].Target != "2001:db8::1" {
+		t.Fatalf("ListPendingNodeOperations(ping) = %#v, error = %v", pending, err)
+	}
+}
+
 func newOperationTestStore(t *testing.T, adapter string, now time.Time) (*Store, Admin, Node, AgentIdentity) {
 	t.Helper()
 	database, err := Open(context.Background(), filepath.Join(t.TempDir(), "operations.db"))

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"path"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ type NodeOperation struct {
 	RetryOf      string
 	Attempt      int
 	MaxLines     int
+	Target       string
 	Output       string
 	ErrorCode    string
 	ErrorMessage string
@@ -55,7 +57,7 @@ type ConfigBackup struct {
 
 const operationColumns = `
 	o.id, o.node_id, n.name, o.sequence, o.type, o.status,
-	COALESCE(o.retry_of, ''), o.attempt, o.max_lines, o.output,
+	COALESCE(o.retry_of, ''), o.attempt, o.max_lines, o.target, o.output,
 	o.error_code, o.error_message, o.rolled_back,
 	COALESCE((SELECT username FROM admins WHERE id = o.requested_by), o.requested_by),
 	o.expires_at, o.started_at, o.completed_at, o.created_at, o.updated_at
@@ -69,7 +71,7 @@ func scanNodeOperation(row rowScanner) (NodeOperation, error) {
 	if err := row.Scan(
 		&operation.ID, &operation.NodeID, &operation.NodeName, &operation.Sequence,
 		&operation.Type, &operation.Status, &operation.RetryOf, &operation.Attempt,
-		&operation.MaxLines, &operation.Output, &operation.ErrorCode,
+		&operation.MaxLines, &operation.Target, &operation.Output, &operation.ErrorCode,
 		&operation.ErrorMessage, &rolledBack, &operation.RequestedBy, &expiresAt,
 		&startedAt, &completedAt, &createdAt, &updatedAt,
 	); err != nil {
@@ -86,7 +88,7 @@ func scanNodeOperation(row rowScanner) (NodeOperation, error) {
 
 func ValidOperationType(value string) bool {
 	switch value {
-	case "probe_core", "restart_core", "tail_core_log", "backup_config":
+	case "probe_core", "restart_core", "tail_core_log", "backup_config", "ping":
 		return true
 	default:
 		return false
@@ -181,8 +183,25 @@ func normalizeOperationLines(operationType string, maxLines int) (int, error) {
 	return maxLines, nil
 }
 
+func normalizeOperationTarget(operationType, target string) (string, error) {
+	target = strings.TrimSpace(target)
+	if operationType != "ping" {
+		if target != "" {
+			return "", ErrUnsupported
+		}
+		return "", nil
+	}
+	ip := net.ParseIP(target)
+	if ip == nil {
+		return "", ErrUnsupported
+	}
+	return ip.String(), nil
+}
+
 func operationTTL(operationType string) time.Duration {
 	switch operationType {
+	case "ping":
+		return 2 * time.Minute
 	case "restart_core", "backup_config":
 		return 15 * time.Minute
 	default:
@@ -197,10 +216,26 @@ func (s *Store) CreateNodeOperation(
 	requestedBy string,
 	now time.Time,
 ) (NodeOperation, error) {
+	return s.CreateTargetedNodeOperation(
+		ctx, nodeID, operationType, maxLines, "", requestedBy, now,
+	)
+}
+
+func (s *Store) CreateTargetedNodeOperation(
+	ctx context.Context,
+	nodeID, operationType string,
+	maxLines int,
+	target, requestedBy string,
+	now time.Time,
+) (NodeOperation, error) {
 	if !ValidOperationType(operationType) {
 		return NodeOperation{}, ErrUnsupported
 	}
 	normalizedLines, err := normalizeOperationLines(operationType, maxLines)
+	if err != nil {
+		return NodeOperation{}, err
+	}
+	normalizedTarget, err := normalizeOperationTarget(operationType, target)
 	if err != nil {
 		return NodeOperation{}, err
 	}
@@ -228,7 +263,8 @@ func (s *Store) CreateNodeOperation(
 		return NodeOperation{}, err
 	}
 	operation, err := insertNodeOperationTx(
-		ctx, tx, nodeID, operationType, normalizedLines, "", 1, requestedBy, now,
+		ctx, tx, nodeID, operationType, normalizedLines, normalizedTarget, "", 1,
+		requestedBy, now,
 	)
 	if err != nil {
 		return NodeOperation{}, err
@@ -244,6 +280,7 @@ func insertNodeOperationTx(
 	tx *sql.Tx,
 	nodeID, operationType string,
 	maxLines int,
+	target string,
 	retryOf string,
 	attempt int,
 	requestedBy string,
@@ -263,11 +300,11 @@ func insertNodeOperationTx(
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO node_operations(
-			id, node_id, sequence, type, retry_of, attempt, max_lines,
+			id, node_id, sequence, type, retry_of, attempt, max_lines, target,
 			requested_by, expires_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, operationID, nodeID, sequence, operationType, retryValue, attempt,
-		maxLines, requestedBy, expiresAt.UnixMilli(), now.UnixMilli(), now.UnixMilli()); err != nil {
+		maxLines, target, requestedBy, expiresAt.UnixMilli(), now.UnixMilli(), now.UnixMilli()); err != nil {
 		return NodeOperation{}, fmt.Errorf("insert node operation: %w", err)
 	}
 	return NodeOperation{ID: operationID, NodeID: nodeID, Sequence: sequence}, nil
@@ -343,13 +380,15 @@ func (s *Store) RetryNodeOperation(
 		return NodeOperation{}, fmt.Errorf("begin retry node operation: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	var operationType, status, adapter string
+	var operationType, status, adapter, target string
 	var maxLines, attempt int
 	if err := tx.QueryRowContext(ctx, `
-		SELECT o.type, o.status, o.max_lines, o.attempt, n.adapter_type
+		SELECT o.type, o.status, o.max_lines, o.target, o.attempt, n.adapter_type
 		FROM node_operations o JOIN nodes n ON n.id = o.node_id AND n.archived_at IS NULL
 		WHERE o.id = ? AND o.node_id = ?
-	`, operationID, nodeID).Scan(&operationType, &status, &maxLines, &attempt, &adapter); errors.Is(err, sql.ErrNoRows) {
+	`, operationID, nodeID).Scan(
+		&operationType, &status, &maxLines, &target, &attempt, &adapter,
+	); errors.Is(err, sql.ErrNoRows) {
 		return NodeOperation{}, ErrNotFound
 	} else if err != nil {
 		return NodeOperation{}, fmt.Errorf("read retry operation: %w", err)
@@ -364,7 +403,8 @@ func (s *Store) RetryNodeOperation(
 		return NodeOperation{}, err
 	}
 	operation, err := insertNodeOperationTx(
-		ctx, tx, nodeID, operationType, maxLines, operationID, attempt+1, requestedBy, now,
+		ctx, tx, nodeID, operationType, maxLines, target, operationID, attempt+1,
+		requestedBy, now,
 	)
 	if err != nil {
 		return NodeOperation{}, err
@@ -426,7 +466,7 @@ func (s *Store) ListPendingNodeOperations(
 		return nil, fmt.Errorf("expire pending operations: %w", err)
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, sequence, type, max_lines, attempt, created_at, expires_at
+		SELECT id, sequence, type, max_lines, target, attempt, created_at, expires_at
 		FROM node_operations
 		WHERE node_id = ? AND sequence > ?
 		  AND (status = 'running' OR (status = 'queued' AND expires_at > ?))
@@ -442,7 +482,7 @@ func (s *Store) ListPendingNodeOperations(
 		var createdAt, expiresAt int64
 		if err := rows.Scan(
 			&operation.ID, &operation.Sequence, &operation.Type, &operation.MaxLines,
-			&operation.Attempt, &createdAt, &expiresAt,
+			&operation.Target, &operation.Attempt, &createdAt, &expiresAt,
 		); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("scan pending operation: %w", err)

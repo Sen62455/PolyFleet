@@ -119,8 +119,8 @@ func TestNativeUserCredentialAndSnapshotLifecycle(t *testing.T) {
 	if err != nil || len(empty.Snapshot.Users) != 0 {
 		t.Fatalf("unassigned snapshot users = %d, error = %v", len(empty.Snapshot.Users), err)
 	}
-	if err := database.ArchiveNode(ctx, nodeOne.ID, now.Add(5*time.Second)); !errors.Is(err, ErrConflict) {
-		t.Fatalf("ArchiveNode(pending unassignment) error = %v, want ErrConflict", err)
+	if err := database.ArchiveNode(ctx, nodeOne.ID, now.Add(5*time.Second)); !errors.Is(err, ErrPending) {
+		t.Fatalf("ArchiveNode(pending unassignment) error = %v, want ErrPending", err)
 	}
 	emptyHash, err := base64.RawURLEncoding.DecodeString(empty.SHA256)
 	if err != nil {
@@ -158,8 +158,8 @@ func TestArchivedUserAssignmentStopsBlockingNodeAfterSnapshotApplies(t *testing.
 	if err := database.ArchiveUser(ctx, user.ID, now.Add(3*time.Second)); err != nil {
 		t.Fatalf("ArchiveUser() error = %v", err)
 	}
-	if err := database.ArchiveNode(ctx, node.ID, now.Add(4*time.Second)); !errors.Is(err, ErrConflict) {
-		t.Fatalf("ArchiveNode(pending removal) error = %v, want ErrConflict", err)
+	if err := database.ArchiveNode(ctx, node.ID, now.Add(4*time.Second)); !errors.Is(err, ErrPending) {
+		t.Fatalf("ArchiveNode(pending removal) error = %v, want ErrPending", err)
 	}
 	node, err = database.GetNode(ctx, node.ID)
 	if err != nil {
@@ -180,6 +180,44 @@ func TestArchivedUserAssignmentStopsBlockingNodeAfterSnapshotApplies(t *testing.
 	}
 	if err := database.ArchiveNode(ctx, node.ID, now.Add(6*time.Second)); err != nil {
 		t.Fatalf("ArchiveNode(applied archived assignment) error = %v", err)
+	}
+}
+
+func TestForceArchiveAllowsDisabledNodeWithUnconfirmedRemoval(t *testing.T) {
+	database, err := Open(t.Context(), filepath.Join(t.TempDir(), "server.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer database.Close()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	node := createTestNode(t, database, "force-archive-node", "native_hysteria2", now)
+	user, _, err := database.CreateUser(t.Context(), NewUser{
+		ID: uuid.NewString(), Username: "force-archive-user", Enabled: true,
+		NodeIDs: []string{node.ID}, Now: now.Add(time.Second),
+	}, bytes.Repeat([]byte{0x61}, 32))
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	if err := database.ArchiveUser(t.Context(), user.ID, now.Add(2*time.Second)); err != nil {
+		t.Fatalf("ArchiveUser() error = %v", err)
+	}
+	if err := database.ArchiveNodeWithForce(
+		t.Context(), node.ID, true, now.Add(3*time.Second),
+	); !errors.Is(err, ErrNodeEnabled) {
+		t.Fatalf("ArchiveNodeWithForce(enabled) error = %v, want ErrNodeEnabled", err)
+	}
+	if _, err := database.DB().ExecContext(t.Context(), `
+		UPDATE nodes SET enabled = 0, status = 'disabled' WHERE id = ?
+	`, node.ID); err != nil {
+		t.Fatalf("disable force archive node: %v", err)
+	}
+	if err := database.ArchiveNodeWithForce(
+		t.Context(), node.ID, true, now.Add(4*time.Second),
+	); err != nil {
+		t.Fatalf("ArchiveNodeWithForce(disabled) error = %v", err)
+	}
+	if _, err := database.GetNode(t.Context(), node.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetNode(force archived) error = %v, want ErrNotFound", err)
 	}
 }
 

@@ -472,38 +472,61 @@ func (s *Store) UpdateNode(ctx context.Context, id string, input UpdateNode) (No
 }
 
 func (s *Store) ArchiveNode(ctx context.Context, id string, now time.Time) error {
+	return s.ArchiveNodeWithForce(ctx, id, false, now)
+}
+
+func (s *Store) ArchiveNodeWithForce(
+	ctx context.Context,
+	id string,
+	force bool,
+	now time.Time,
+) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin archive node: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	var enabled int
+	var desiredVersion, appliedVersion int64
+	var installationID string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT enabled, desired_version, applied_version, COALESCE(agent_installation_id, '')
+		FROM nodes WHERE id = ? AND archived_at IS NULL
+	`, id).Scan(&enabled, &desiredVersion, &appliedVersion, &installationID); errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return fmt.Errorf("read archive node state: %w", err)
+	}
+	if force && enabled != 0 {
+		return ErrNodeEnabled
+	}
 	var assignments int
 	if err := tx.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM node_user_assignments a
 		JOIN users u ON u.id = a.user_id
-		WHERE a.node_id = ? AND (
-			u.archived_at IS NULL OR a.state <> 'applied' OR a.applied_version < a.desired_version
-		)
+		WHERE a.node_id = ? AND u.archived_at IS NULL
 	`, id).Scan(&assignments); err != nil {
 		return fmt.Errorf("count node assignments: %w", err)
 	}
 	if assignments != 0 {
 		return ErrConflict
 	}
-	var pendingAppliedSnapshot int
-	if err := tx.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM nodes n
-			WHERE n.id = ? AND COALESCE(n.agent_installation_id, '') <> ''
-			  AND n.applied_version < n.desired_version
-		)
-	`, id).Scan(&pendingAppliedSnapshot); err != nil {
-		return fmt.Errorf("check pending node removals: %w", err)
-	}
-	if pendingAppliedSnapshot != 0 {
-		return ErrConflict
+	if !force {
+		var pendingArchivedAssignments int
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COUNT(*)
+			FROM node_user_assignments a
+			JOIN users u ON u.id = a.user_id
+			WHERE a.node_id = ? AND u.archived_at IS NOT NULL
+			  AND (a.state <> 'applied' OR a.applied_version < a.desired_version)
+		`, id).Scan(&pendingArchivedAssignments); err != nil {
+			return fmt.Errorf("count pending archived assignments: %w", err)
+		}
+		if pendingArchivedAssignments != 0 ||
+			(installationID != "" && appliedVersion < desiredVersion) {
+			return ErrPending
+		}
 	}
 	result, err := tx.ExecContext(ctx, `
 		UPDATE nodes SET enabled = 0, status = 'disabled', archived_at = ?, updated_at = ?

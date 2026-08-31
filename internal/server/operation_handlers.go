@@ -17,6 +17,7 @@ import (
 type nodeOperationRequest struct {
 	Type     string `json:"type"`
 	MaxLines int    `json:"max_lines"`
+	Target   string `json:"target"`
 }
 
 type nodeOperationResponse struct {
@@ -29,6 +30,7 @@ type nodeOperationResponse struct {
 	RetryOf      string     `json:"retry_of,omitempty"`
 	Attempt      int        `json:"attempt"`
 	MaxLines     int        `json:"max_lines"`
+	Target       string     `json:"target"`
 	Output       string     `json:"output"`
 	ErrorCode    string     `json:"error_code"`
 	ErrorMessage string     `json:"error_message"`
@@ -125,9 +127,9 @@ func (a *App) handleCreateNodeOperation(response http.ResponseWriter, request *h
 	}
 	input.Type = strings.TrimSpace(input.Type)
 	session := sessionFromContext(request.Context())
-	operation, err := a.store.CreateNodeOperation(
+	operation, err := a.store.CreateTargetedNodeOperation(
 		request.Context(), chi.URLParam(request, "nodeID"), input.Type,
-		input.MaxLines, session.AdminID, time.Now().UTC(),
+		input.MaxLines, input.Target, session.AdminID, time.Now().UTC(),
 	)
 	if a.writeOperationStoreError(response, request, err) {
 		return
@@ -337,6 +339,7 @@ func presentNodeOperation(operation store.NodeOperation) nodeOperationResponse {
 		ID: operation.ID, NodeID: operation.NodeID, NodeName: operation.NodeName,
 		Sequence: operation.Sequence, Type: operation.Type, Status: operation.Status,
 		RetryOf: operation.RetryOf, Attempt: operation.Attempt, MaxLines: operation.MaxLines,
+		Target: operation.Target,
 		Output: operation.Output, ErrorCode: operation.ErrorCode,
 		ErrorMessage: operation.ErrorMessage, RolledBack: operation.RolledBack,
 		RequestedBy: operation.RequestedBy,

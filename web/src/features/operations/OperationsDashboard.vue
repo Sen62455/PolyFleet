@@ -44,6 +44,7 @@ const operationLabels: Record<NodeOperationType, string> = {
   restart_core: "重启核心",
   tail_core_log: "有限日志",
   backup_config: "配置备份",
+  ping: "延迟探测",
 };
 const nodeOptions = computed(() => [
   { label: "全部节点", value: "" },
@@ -234,6 +235,7 @@ onMounted(() => void load());
         <dl class="detail-list">
           <div><dt>节点</dt><dd>{{ selected.node_name }}</dd></div>
           <div><dt>尝试</dt><dd>第 {{ selected.attempt }} 次</dd></div>
+          <div v-if="selected.target"><dt>目标 IP</dt><dd>{{ selected.target }}</dd></div>
           <div><dt>提交时间</dt><dd>{{ formatDateTime(selected.created_at, false) }}</dd></div>
           <div><dt>完成时间</dt><dd>{{ formatDateTime(selected.completed_at, false) }}</dd></div>
           <div><dt>耗时</dt><dd>{{ duration(selected) }}</dd></div>

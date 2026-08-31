@@ -83,7 +83,7 @@ command -v apt-get >/dev/null 2>&1 || fail "apt-get is required on a clean host"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  ca-certificates coreutils curl openssl passwd tar util-linux
+  ca-certificates coreutils curl iputils-ping openssl passwd tar util-linux
 
 case "$(uname -m)" in
   x86_64)

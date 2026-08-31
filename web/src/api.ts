@@ -158,8 +158,11 @@ export const api = {
       body: JSON.stringify({ provider_used_bytes: providerUsedBytes }),
     }),
 
-  archiveNode: (id: string) =>
-    request<void>(`/api/v1/nodes/${encodeURIComponent(id)}`, { method: "DELETE", body: "{}" }),
+  archiveNode: (id: string, force = false) =>
+    request<void>(`/api/v1/nodes/${encodeURIComponent(id)}${force ? "?force=true" : ""}`, {
+      method: "DELETE",
+      body: "{}",
+    }),
 
   createEnrollmentToken: (id: string) =>
     request<EnrollmentToken>(`/api/v1/nodes/${encodeURIComponent(id)}/enrollment-token`, {
@@ -184,10 +187,10 @@ export const api = {
     return request<OperationPage>(`/api/v1/operations?${query.toString()}`);
   },
 
-  createNodeOperation: (nodeId: string, type: NodeOperationType, maxLines = 0) =>
+  createNodeOperation: (nodeId: string, type: NodeOperationType, maxLines = 0, target = "") =>
     request<NodeOperationRecord>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/operations`, {
       method: "POST",
-      body: JSON.stringify({ type, max_lines: maxLines }),
+      body: JSON.stringify({ type, max_lines: maxLines, target }),
     }),
 
   retryNodeOperation: (nodeId: string, operationId: string) =>

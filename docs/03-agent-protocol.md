@@ -224,7 +224,8 @@ client passwords are never accepted by this endpoint.
 ### `GET /agent/v1/operations?after=<sequence>`
 
 Returns only typed operations such as `probe_core`, `restart_core`,
-`tail_core_log`, or `backup_config`. There is no `command` string. Agent-side
+`tail_core_log`, `backup_config`, or `ping`. Ping accepts only a validated IP
+address and runs with a fixed packet count and timeout. There is no `command` string. Agent-side
 execution is single-flight and independent from heartbeat scheduling.
 
 ### `POST /agent/v1/operations/{id}/result`

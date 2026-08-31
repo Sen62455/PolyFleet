@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	pathpkg "path"
@@ -213,6 +214,8 @@ func (helper *Helper) Handle(ctx context.Context, request HelperRequest) HelperR
 	switch operation.Type {
 	case "probe_core":
 		response = helper.probeCore(ctx, operation)
+	case "ping":
+		response = helper.pingTarget(ctx, operation)
 	case "restart_core":
 		response = helper.restartCore(ctx, operation)
 	case "tail_core_log":
@@ -269,17 +272,40 @@ func validateHelperOperation(operation protocol.NodeOperation) error {
 	}
 	switch operation.Type {
 	case "probe_core", "restart_core", "backup_config":
-		if operation.MaxLines != 0 {
+		if operation.MaxLines != 0 || operation.Target != "" {
 			return errors.New("operation does not accept max_lines")
 		}
+	case "ping":
+		if operation.MaxLines != 0 || net.ParseIP(operation.Target) == nil {
+			return errors.New("ping target is invalid")
+		}
 	case "tail_core_log":
-		if operation.MaxLines < 1 || operation.MaxLines > MaxLogLines {
+		if operation.MaxLines < 1 || operation.MaxLines > MaxLogLines || operation.Target != "" {
 			return errors.New("log line limit is invalid")
 		}
 	default:
 		return errors.New("operation type is unsupported")
 	}
 	return nil
+}
+
+func (helper *Helper) pingTarget(ctx context.Context, operation protocol.NodeOperation) HelperResponse {
+	response := HelperResponse{Sequence: operation.Sequence, CompletedAt: helper.now()}
+	pingContext, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	output, err := helper.command(
+		pingContext, "ping", "-n", "-c", "4", "-W", "2", operation.Target,
+	)
+	response.Output = string(output)
+	response.CompletedAt = helper.now()
+	if err != nil {
+		response.Status = "failed"
+		response.ErrorCode = "ping_failed"
+		response.ErrorMessage = commandErrorMessage(err, "target did not respond to ping")
+		return response
+	}
+	response.Status = "succeeded"
+	return response
 }
 
 func (helper *Helper) probeCore(ctx context.Context, operation protocol.NodeOperation) HelperResponse {

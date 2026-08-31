@@ -386,7 +386,8 @@ export type NodeOperationType =
   | "probe_core"
   | "restart_core"
   | "tail_core_log"
-  | "backup_config";
+  | "backup_config"
+  | "ping";
 export type NodeOperationStatus = "queued" | "running" | "succeeded" | "failed" | "expired";
 
 export interface NodeOperationRecord {
@@ -399,6 +400,7 @@ export interface NodeOperationRecord {
   retry_of?: string;
   attempt: number;
   max_lines: number;
+  target: string;
   output: string;
   error_code: string;
   error_message: string;

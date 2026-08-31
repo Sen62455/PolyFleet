@@ -10,6 +10,39 @@ import (
 	"github.com/Sen62455/PolyFleet/internal/protocol"
 )
 
+func TestNodePingOperationValidatesAndDeliversTarget(t *testing.T) {
+	app := newTestApp(t)
+	app.bootstrap(t)
+	created := app.request(t, http.MethodPost, "/api/v1/nodes", map[string]any{
+		"name": "ping-node", "adapter_type": "native_hysteria2",
+	}, app.csrf, "")
+	requireStatus(t, created, http.StatusCreated)
+	var node nodeResponse
+	decodeResponse(t, created, &node)
+	_, credential := enrollOperationAgentForTest(t, app, node.ID)
+
+	invalid := app.request(t, http.MethodPost, "/api/v1/nodes/"+node.ID+"/operations",
+		map[string]any{"type": "ping", "target": "example.com"}, app.csrf, "")
+	requireStatus(t, invalid, http.StatusUnprocessableEntity)
+	queued := app.request(t, http.MethodPost, "/api/v1/nodes/"+node.ID+"/operations",
+		map[string]any{"type": "ping", "target": "42.49.64.154"}, app.csrf, "")
+	requireStatus(t, queued, http.StatusCreated)
+	var operation nodeOperationResponse
+	decodeResponse(t, queued, &operation)
+	if operation.Type != "ping" || operation.Target != "42.49.64.154" {
+		t.Fatalf("queued ping operation = %#v", operation)
+	}
+
+	poll := agentRequest(t, app.handler, http.MethodGet,
+		"/agent/v1/operations?after=0", nil, credential, cryptoutil.NewID())
+	requireStatus(t, poll, http.StatusOK)
+	var pending protocol.NodeOperationsResponse
+	decodeResponse(t, poll, &pending)
+	if len(pending.Operations) != 1 || pending.Operations[0].Target != "42.49.64.154" {
+		t.Fatalf("pending ping operations = %#v", pending.Operations)
+	}
+}
+
 func TestNodeOperationAPIQueuesReportsRetriesAndAlerts(t *testing.T) {
 	app := newTestApp(t)
 	app.bootstrap(t)

@@ -331,6 +331,7 @@ type NodeOperation struct {
 	Sequence  int64     `json:"sequence"`
 	Type      string    `json:"type"`
 	MaxLines  int       `json:"max_lines,omitempty"`
+	Target    string    `json:"target,omitempty"`
 	Attempt   int       `json:"attempt"`
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`

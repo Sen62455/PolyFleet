@@ -4,12 +4,13 @@ import {
   Activity,
   Archive,
   KeyRound,
+  RadioTower,
   RefreshCw,
   RotateCw,
   ScrollText,
   Undo2,
 } from "@lucide/vue";
-import { NButton, NIcon, NSpin, NTag, NTooltip, useDialog, useMessage } from "naive-ui";
+import { NButton, NIcon, NInput, NSpin, NTag, NTooltip, useDialog, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import { formatBytes, formatDateTime, relativeTime } from "../../lib/format";
 import type {
@@ -30,6 +31,7 @@ const loading = ref(true);
 const refreshing = ref(false);
 const loadError = ref("");
 const working = ref("");
+const pingTarget = ref("42.49.64.154");
 
 const hasPending = computed(() =>
   operations.value.some((operation) => operation.status === "queued" || operation.status === "running"),
@@ -49,6 +51,7 @@ const operationLabels: Record<NodeOperationType, string> = {
   restart_core: "重启核心",
   tail_core_log: "有限日志",
   backup_config: "配置备份",
+  ping: "延迟探测",
 };
 
 function readableError(error: unknown, fallback: string) {
@@ -84,10 +87,15 @@ async function load(silent = false) {
   }
 }
 
-async function createOperation(type: NodeOperationType) {
+async function createOperation(type: NodeOperationType, target = "") {
   working.value = type;
   try {
-    await api.createNodeOperation(props.node.id, type, type === "tail_core_log" ? 100 : 0);
+    await api.createNodeOperation(
+      props.node.id,
+      type,
+      type === "tail_core_log" ? 100 : 0,
+      target,
+    );
     await load(true);
     message.success(`${operationLabels[type]}已加入队列`);
   } catch (error) {
@@ -95,6 +103,15 @@ async function createOperation(type: NodeOperationType) {
   } finally {
     working.value = "";
   }
+}
+
+async function pingNodeTarget() {
+  const target = pingTarget.value.trim();
+  if (!target) {
+    message.warning("请输入要探测的 IPv4 或 IPv6 地址。");
+    return;
+  }
+  await createOperation("ping", target);
 }
 
 function restartCore() {
@@ -193,7 +210,7 @@ watch(
 </script>
 
 <template>
-  <section class="detail-section operations-panel">
+  <section class="detail-section operations-panel" :class="{ 'operations-panel--compact': compact }">
     <div class="detail-section__heading">
       <h2>运维</h2>
       <div class="operations-panel__heading-actions">
@@ -283,6 +300,30 @@ watch(
       </n-button>
     </div>
 
+    <div class="ping-tool">
+      <div class="ping-tool__identity">
+        <n-icon :size="18"><radio-tower /></n-icon>
+        <div>
+          <strong>服务器到本机延迟</strong>
+          <span>源：{{ node.name }} · {{ node.public_host || node.hostname || "Agent 所在服务器" }}</span>
+        </div>
+      </div>
+      <div class="ping-tool__controls">
+        <n-input
+          v-model:value="pingTarget"
+          aria-label="Ping 目标 IP"
+          placeholder="IPv4 或 IPv6"
+          maxlength="64"
+          clearable
+          @keyup.enter="pingNodeTarget"
+        />
+        <n-button type="primary" :loading="working === 'ping'" @click="pingNodeTarget">
+          开始 Ping
+        </n-button>
+      </div>
+      <small>固定发送 4 个 ICMP 请求，每次等待不超过 2 秒；目标默认是 42.49.64.154。</small>
+    </div>
+
     <div v-if="loading" class="operations-state"><n-spin :size="22" /></div>
     <div v-else-if="loadError" class="operations-state operations-state--error">{{ loadError }}</div>
     <div v-else-if="operations.length" class="operation-list">
@@ -301,6 +342,7 @@ watch(
         </p>
         <div class="operation-meta">
           <span>{{ relativeTime(operation.completed_at || operation.created_at) }}</span>
+          <span v-if="operation.target">目标 {{ operation.target }}</span>
           <span v-if="operation.rolled_back">已恢复最近可用配置</span>
           <n-button
             v-if="operation.status === 'failed' || operation.status === 'expired'"

@@ -49,6 +49,7 @@ systemd socket 按需启动的 `hyfleet-agent-ops` helper 以 root 运行。help
 | `restart_core` | 备份、重启、健康检查，失败时恢复 | 45 秒 Agent deadline |
 | `tail_core_log` | 固定 unit 的 `journalctl` | 200 行、32 KiB |
 | `backup_config` | 复制配置中的固定文件或受限分片目录 | 解压后最大 8 MiB |
+| `ping` | 从所选节点向已校验的 IPv4/IPv6 地址发送 ICMP | 固定 4 次、单次 2 秒、总计 12 秒 |
 
 helper 不解释 shell，不接受命令字符串，也不能切换到其他 systemd unit。Hysteria2
 配置必须位于 `/etc/hysteria`，sing-box 配置必须位于 `/etc/sing-box`；这与 systemd

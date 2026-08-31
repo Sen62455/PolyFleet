@@ -288,6 +288,31 @@ func TestHelperRejectsMissingOrMultipleActions(t *testing.T) {
 	}
 }
 
+func TestHelperPingUsesFixedArgumentsAndRejectsNonIPAddress(t *testing.T) {
+	helper, _ := testHelper(t, "known-good: true\n")
+	helper.RunCommand = func(_ context.Context, name string, arguments ...string) ([]byte, error) {
+		if name != "ping" || strings.Join(arguments, " ") != "-n -c 4 -W 2 42.49.64.154" {
+			t.Fatalf("unexpected ping command: %s %v", name, arguments)
+		}
+		return []byte("4 packets transmitted, 4 received, time 22ms\n"), nil
+	}
+	operation := protocol.NodeOperation{
+		ID: uuid.NewString(), Sequence: 1, Type: "ping", Target: "42.49.64.154", Attempt: 1,
+	}
+	result := helper.Handle(t.Context(), HelperRequest{Operation: &operation})
+	if result.Status != "succeeded" || !strings.Contains(result.Output, "4 received") {
+		t.Fatalf("ping result = %#v", result)
+	}
+
+	invalid := protocol.NodeOperation{
+		ID: uuid.NewString(), Sequence: 2, Type: "ping", Target: "-c 99", Attempt: 1,
+	}
+	result = helper.Handle(t.Context(), HelperRequest{Operation: &invalid})
+	if result.Status != "failed" || result.ErrorCode != "operation_invalid" {
+		t.Fatalf("invalid ping result = %#v", result)
+	}
+}
+
 func TestRealityHelperBackupReportsConfiguredHostPath(t *testing.T) {
 	helper, _ := testHelper(t, "known-good: true\n")
 	helper.BackupDir = filepath.Join(t.TempDir(), "hyfleet-backups-lab")

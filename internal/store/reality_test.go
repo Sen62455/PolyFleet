@@ -428,8 +428,8 @@ func TestVLESSRealityNodeArchiveWaitsForUnassignmentAcknowledgement(t *testing.T
 	if err != nil {
 		t.Fatalf("GetNode(unassigned) error = %v", err)
 	}
-	if err := database.ArchiveNode(ctx, node.ID, now.Add(4*time.Second)); !errors.Is(err, ErrConflict) {
-		t.Fatalf("ArchiveNode(pending removal) error = %v, want ErrConflict", err)
+	if err := database.ArchiveNode(ctx, node.ID, now.Add(4*time.Second)); !errors.Is(err, ErrPending) {
+		t.Fatalf("ArchiveNode(pending removal) error = %v, want ErrPending", err)
 	}
 	empty, err := database.GetDesiredSnapshot(ctx, node.ID, node.DesiredVersion)
 	if err != nil || len(empty.Snapshot.Users) != 0 {

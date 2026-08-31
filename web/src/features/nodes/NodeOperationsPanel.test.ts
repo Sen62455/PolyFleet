@@ -22,6 +22,7 @@ const failedOperation: NodeOperationRecord = {
   status: "failed",
   attempt: 1,
   max_lines: 0,
+  target: "",
   output: "service remained inactive",
   error_code: "core_restart_failed",
   error_message: "core restart failed",
@@ -48,6 +49,42 @@ const backup: ConfigBackupRecord = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("NodeOperationsPanel", () => {
+	it("binds the selected node as source and queues the default ping target", async () => {
+	  vi.spyOn(api, "listNodeOperations").mockResolvedValue([]);
+	  vi.spyOn(api, "listConfigBackups").mockResolvedValue([]);
+	  const create = vi.spyOn(api, "createNodeOperation").mockResolvedValue({
+		...failedOperation,
+		id: "ping-operation",
+		type: "ping",
+		status: "queued",
+		target: "42.49.64.154",
+	  });
+	  const host = defineComponent({
+		components: { NDialogProvider, NMessageProvider, NodeOperationsPanel },
+		setup: () => ({ node }),
+		template: `
+		  <n-dialog-provider>
+			<n-message-provider>
+			  <node-operations-panel :node="node" />
+			</n-message-provider>
+		  </n-dialog-provider>
+		`,
+	  });
+	  const wrapper = mount(host, { attachTo: document.body });
+	  await flushPromises();
+
+	  expect(wrapper.text()).toContain("源：LisaHost");
+	  const input = wrapper.find("input").element as HTMLInputElement;
+	  expect(input.value).toBe("42.49.64.154");
+	  const button = wrapper.findAll("button").find((item) => item.text().trim() === "开始 Ping");
+	  expect(button).toBeDefined();
+	  await button!.trigger("click");
+	  await flushPromises();
+
+	  expect(create).toHaveBeenCalledWith("node-1", "ping", 0, "42.49.64.154");
+	  wrapper.unmount();
+	});
+
   it("shows rollback evidence and queues a retry for a failed operation", async () => {
     vi.spyOn(api, "listNodeOperations").mockResolvedValue([failedOperation]);
     vi.spyOn(api, "listConfigBackups").mockResolvedValue([backup]);
