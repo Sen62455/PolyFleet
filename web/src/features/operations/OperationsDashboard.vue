@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { Eye, RefreshCw, RotateCcw } from "@lucide/vue";
+import { Activity, CheckCircle2, CircleAlert, ClipboardList, Eye, RefreshCw, RotateCcw } from "@lucide/vue";
 import {
   NButton,
   NDrawer,
@@ -14,6 +14,7 @@ import {
   useMessage,
 } from "naive-ui";
 import { api, APIError } from "../../api";
+import StatCard from "../../components/StatCard.vue";
 import { formatDateTime } from "../../lib/format";
 import type {
   NodeOperationRecord,
@@ -146,9 +147,9 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <main class="workspace operations-workspace">
+  <main class="workspace operations-workspace operations-log-workspace">
     <div class="page-heading">
-      <div><h1>操作记录</h1><p>节点运维任务与执行结果</p></div>
+      <div><h2>操作记录</h2><p>节点运维任务与执行结果</p></div>
       <n-tooltip trigger="hover">
         <template #trigger>
           <n-button circle secondary aria-label="刷新操作记录" :loading="refreshing" @click="load(true)">
@@ -159,30 +160,45 @@ onMounted(() => void load());
       </n-tooltip>
     </div>
 
-    <section class="operations-summary" aria-label="当前页操作摘要">
-      <div><span>执行中</span><strong>{{ runningCount }}</strong></div>
-      <div class="operations-summary--danger"><span>失败 / 过期</span><strong>{{ failedCount }}</strong></div>
-      <div class="operations-summary--success"><span>成功</span><strong>{{ succeededCount }}</strong></div>
-      <div><span>匹配记录</span><strong>{{ total }}</strong></div>
-    </section>
-
-    <section class="operations-filters" aria-label="操作记录筛选">
-      <n-select v-model:value="nodeFilter" :options="nodeOptions" aria-label="筛选节点" />
-      <n-select v-model:value="typeFilter" :options="typeOptions" aria-label="筛选操作类型" />
-      <div class="status-segment">
-        <button
-          v-for="item in statuses"
-          :key="item.value"
-          type="button"
-          :class="{ active: statusFilter === item.value }"
-          :aria-pressed="statusFilter === item.value"
-          @click="statusFilter = item.value"
-        >{{ item.label }}</button>
-      </div>
+    <section class="stat-grid" aria-label="当前页操作摘要">
+      <stat-card label="执行中">
+        <template #icon><activity :size="18" /></template>
+        {{ runningCount }}
+        <template #hint>当前页排队与执行中的任务</template>
+      </stat-card>
+      <stat-card label="失败 / 过期" :tone="failedCount ? 'critical' : 'neutral'" :muted="!failedCount">
+        <template #icon><circle-alert :size="18" /></template>
+        {{ failedCount }}
+        <template #hint>当前页需关注的任务</template>
+      </stat-card>
+      <stat-card label="成功" tone="signal">
+        <template #icon><check-circle2 :size="18" /></template>
+        {{ succeededCount }}
+        <template #hint>当前页已完成的任务</template>
+      </stat-card>
+      <stat-card label="匹配记录" tone="neutral">
+        <template #icon><clipboard-list :size="18" /></template>
+        {{ total }}
+        <template #hint>符合筛选条件的全部记录</template>
+      </stat-card>
     </section>
 
     <div v-if="loadError" class="operations-page-error">{{ loadError }}</div>
-    <section class="operations-table-surface">
+    <section class="ops-surface operations-table-surface" aria-label="操作记录">
+      <header class="operations-filters" aria-label="操作记录筛选">
+        <n-select v-model:value="nodeFilter" :options="nodeOptions" :consistent-menu-width="false" aria-label="筛选节点" />
+        <n-select v-model:value="typeFilter" :options="typeOptions" :consistent-menu-width="false" aria-label="筛选操作类型" />
+        <div class="status-segment">
+          <button
+            v-for="item in statuses"
+            :key="item.value"
+            type="button"
+            :class="{ active: statusFilter === item.value }"
+            :aria-pressed="statusFilter === item.value"
+            @click="statusFilter = item.value"
+          >{{ item.label }}</button>
+        </div>
+      </header>
       <div v-if="loading" class="operations-page-state"><n-spin :size="26" /></div>
       <div v-else-if="operations.length === 0" class="operations-page-state">没有匹配的操作记录</div>
       <div v-else class="operations-table-wrap">
@@ -248,3 +264,43 @@ onMounted(() => void load());
     </n-drawer>
   </main>
 </template>
+
+<style scoped>
+.operations-table-surface {
+  overflow: hidden;
+  border-radius: var(--hf-radius);
+}
+
+.operations-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hf-line);
+  background: transparent;
+}
+
+.operations-filters :deep(.n-select) {
+  width: 220px;
+  flex: 0 0 auto;
+}
+
+.operations-filters .status-segment {
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .operations-filters .status-segment {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .operations-filters :deep(.n-select) {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
+</style>

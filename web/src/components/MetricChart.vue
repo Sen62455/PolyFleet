@@ -41,6 +41,18 @@ const lines = computed(() => props.series.map((item) => ({
   ...item,
   points: item.values.map((value, index) => `${x(index)},${y(value)}`).join(" "),
 })));
+const areaGradientId = `${useId()}-area`;
+const firstArea = computed(() => {
+  const first = lines.value[0];
+  if (!first || first.values.length < 2) return null;
+  const baseline = padding.top + plotHeight;
+  const path = first.values.map((value, index) => `L ${x(index)},${y(value)}`).join(' ');
+  return {
+    color: first.color,
+    d: `M ${x(0)},${baseline} ${path} L ${x(first.values.length - 1)},${baseline} Z`,
+  };
+});
+
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((ratio) => ({
   ratio,
   value: maximum.value * ratio,
@@ -173,6 +185,13 @@ watch(pointCount, () => void nextTick(syncCanvasWidth));
           {{ valueFormatter(tick.value) }}
         </text>
       </g>
+<defs v-if="firstArea">
+  <linearGradient :id="areaGradientId" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" :style="{ stopColor: firstArea.color, stopOpacity: 0.22 }" />
+    <stop offset="100%" :style="{ stopColor: firstArea.color, stopOpacity: 0 }" />
+  </linearGradient>
+</defs>
+<path v-if="firstArea" :d="firstArea.d" :fill="`url(#${areaGradientId})`" />
       <polyline
         v-for="line in lines"
         :key="line.name"

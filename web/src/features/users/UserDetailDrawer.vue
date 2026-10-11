@@ -27,7 +27,7 @@ import {
   NTag,
   NTooltip,
 } from "naive-ui";
-import { adapterLabels, formatBytes, formatDateTime, quotaPercent, relativeTime } from "../../lib/format";
+import { adapterLabels, formatBytes, formatDateTime, progressStatus, quotaPercent, relativeTime } from "../../lib/format";
 import type { NodeRecord, SubscriptionTokenRecord, UserAssignment, UserRecord } from "../../types";
 
 const props = defineProps<{
@@ -270,7 +270,7 @@ function formatLabel(format: string) {
             type="line"
             :percentage="quotaPercent(user.traffic_used_bytes, user.traffic_limit_bytes)"
             :show-indicator="false"
-            :status="user.quota_state === 'limited' ? 'error' : 'success'"
+            :status="user.quota_state === 'limited' ? 'error' : progressStatus(quotaPercent(user.traffic_used_bytes, user.traffic_limit_bytes))"
           />
           <footer>
             <span>上传 {{ formatBytes(user.traffic_upload_bytes) }}</span>
@@ -450,7 +450,7 @@ function formatLabel(format: string) {
               type="line"
               :percentage="quotaPercent(assignment.traffic_used_bytes, assignment.traffic_limit_bytes)"
               :show-indicator="false"
-              :status="assignment.quota_state === 'limited' ? 'error' : 'success'"
+              :status="assignment.quota_state === 'limited' ? 'error' : progressStatus(quotaPercent(assignment.traffic_used_bytes, assignment.traffic_limit_bytes))"
             />
             <div
               v-if="assignment.management_mode === 'managed'"

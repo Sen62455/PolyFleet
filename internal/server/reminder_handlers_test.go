@@ -7,6 +7,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/Sen62455/PolyFleet/internal/store"
 )
 
 func TestReminderRuleAndAuthorizedTelegramBotFlow(t *testing.T) {
@@ -35,12 +38,32 @@ func TestReminderRuleAndAuthorizedTelegramBotFlow(t *testing.T) {
 		"name": "Six-hour status", "notifier_id": notifier.ID,
 		"kind": "fleet_summary", "enabled": true, "interval_minutes": 360,
 		"lead_days": 30, "threshold_percent": 80, "node_ids": []string{node.ID},
+		"message_template": "请检查服务器\n{{details}}\n{{time}}",
 	}, app.csrf, "")
 	requireStatus(t, createdRule, http.StatusOK)
 	var rule notificationReminderRuleResponse
 	decodeResponse(t, createdRule, &rule)
 	if rule.Kind != "fleet_summary" || rule.IntervalMinutes != 360 || len(rule.NodeIDs) != 1 {
 		t.Fatalf("unexpected reminder rule: %#v", rule)
+	}
+	if rule.MessageTemplate != "请检查服务器\n{{details}}\n{{time}}" {
+		t.Fatalf("template not persisted: %q", rule.MessageTemplate)
+	}
+	update := map[string]any{
+		"id": rule.ID, "name": rule.Name, "notifier_id": notifier.ID,
+		"kind": rule.Kind, "enabled": true, "interval_minutes": 360,
+		"lead_days": 30, "threshold_percent": 80, "node_ids": []string{node.ID},
+	}
+	legacyUpdate := app.request(t, http.MethodPut, "/api/v1/reminder-rules", update, app.csrf, "")
+	requireStatus(t, legacyUpdate, http.StatusOK)
+	var preserved notificationReminderRuleResponse
+	decodeResponse(t, legacyUpdate, &preserved)
+	if preserved.MessageTemplate != rule.MessageTemplate {
+		t.Fatal("legacy update erased template")
+	}
+	for _, invalid := range []string{"{{unknown}}", strings.Repeat("字", 2001)} {
+		update["message_template"] = invalid
+		requireStatus(t, app.request(t, http.MethodPut, "/api/v1/reminder-rules", update, app.csrf, ""), http.StatusUnprocessableEntity)
 	}
 
 	var sendCount atomic.Int32
@@ -64,6 +87,15 @@ func TestReminderRuleAndAuthorizedTelegramBotFlow(t *testing.T) {
 			}, nil
 		}
 		sendCount.Add(1)
+		var sent struct {
+			Text string `json:"text"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&sent); err != nil {
+			t.Fatal(err)
+		}
+		if sendCount.Load() == 1 && (!strings.Contains(sent.Text, "规则名称：Six-hour status\n提醒类型：周期运行概览\n提醒频率：每 6 小时") || !strings.Contains(sent.Text, "请检查服务器") || strings.Contains(sent.Text, "{{details}}")) {
+			t.Fatalf("custom reminder payload = %q", sent.Text)
+		}
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
@@ -89,6 +121,15 @@ func TestReminderRuleAndAuthorizedTelegramBotFlow(t *testing.T) {
 	if sendCount.Load() != 2 {
 		t.Fatalf("Telegram sends = %d, want reminder plus one authorized bot reply", sendCount.Load())
 	}
+	stored, err := app.store.GetNotificationReminderRule(t.Context(), rule.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored.Kind = "asset_expiry"
+	sent, _, err := app.application.executeNotificationReminder(t.Context(), stored, time.Now().UTC())
+	if err != nil || sent || sendCount.Load() != 2 {
+		t.Fatalf("custom body bypassed match condition: sent=%v err=%v", sent, err)
+	}
 	var offset int64
 	if err := app.store.DB().QueryRow(
 		"SELECT update_offset FROM telegram_bot_access WHERE notifier_id = ?", notifier.ID,
@@ -102,5 +143,13 @@ func TestReminderRuleAndAuthorizedTelegramBotFlow(t *testing.T) {
 		!strings.Contains(settings.Body.String(), `"telegram_bots"`) ||
 		strings.Contains(settings.Body.String(), "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk") {
 		t.Fatalf("unexpected notification settings response: %s", settings.Body.String())
+	}
+}
+
+func TestReminderFixedHeaderAndDefaultBody(t *testing.T) {
+	rule := store.NotificationReminderRule{Name: "test\nname", Kind: "active_alerts", IntervalMinutes: 15}
+	message := formatNotificationReminderMessage(rule, "system details", time.Now())
+	if message != "规则名称：test name\n提醒类型：活动告警重复提醒\n提醒频率：每 15 分钟\n\nsystem details" {
+		t.Fatalf("message = %q", message)
 	}
 }

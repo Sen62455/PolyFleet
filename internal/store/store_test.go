@@ -60,6 +60,12 @@ func TestOpenAppliesMigrationsAndSQLitePolicy(t *testing.T) {
 	`).Scan(&nodePing); err != nil || nodePing != 1 {
 		t.Fatalf("node ping migration count = %d, error = %v", nodePing, err)
 	}
+	var exitProxies int
+	if err := database.DB().QueryRow(`
+		SELECT COUNT(*) FROM schema_migrations WHERE version = '0017_exit_proxies.sql'
+	`).Scan(&exitProxies); err != nil || exitProxies != 1 {
+		t.Fatalf("exit proxy migration count = %d, error = %v", exitProxies, err)
+	}
 }
 
 func TestHeartbeatPoolSurvivesBusyReadConnection(t *testing.T) {

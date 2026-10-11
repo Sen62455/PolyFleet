@@ -60,42 +60,78 @@ function submit() {
   <n-modal
     :show="show"
     preset="card"
-    class="asset-modal"
+    class="node-asset-modal compact-dialog"
     :title="`VPS 资产档案 · ${node?.name || ''}`"
+    :bordered="false"
     :mask-closable="!saving"
+    :segmented="{ content: true, footer: true }"
+    :style="{ width: 'min(720px, calc(100vw - 40px))' }"
     @update:show="emit('update:show', $event)"
   >
-    <n-form label-placement="top" @submit.prevent="submit">
-      <div class="asset-modal__grid">
-        <n-form-item label="套餐 / 规格">
-          <n-input v-model:value="plan" maxlength="120" placeholder="例如 LAX.Pro.Pocket" />
-        </n-form-item>
-        <n-form-item label="续费周期（月）">
-          <n-input-number v-model:value="renewalCycleMonths" :min="0" :max="120" />
-        </n-form-item>
-        <n-form-item label="购买日期">
-          <n-date-picker v-model:value="purchasedAt" type="date" clearable />
-        </n-form-item>
-        <n-form-item label="到期日期">
-          <n-date-picker v-model:value="expiresAt" type="date" clearable />
-        </n-form-item>
-      </div>
-      <n-form-item label="自动续费">
-        <n-switch v-model:value="autoRenew" />
-      </n-form-item>
-      <n-form-item label="资产备注">
-        <n-input v-model:value="notes" type="textarea" :rows="3" maxlength="1000" placeholder="账单、续费或供应商备注" />
-      </n-form-item>
-      <div class="modal-actions">
-        <n-button :disabled="saving" @click="emit('update:show', false)">取消</n-button>
-        <n-button type="primary" attr-type="submit" :loading="saving">保存资产档案</n-button>
+    <n-form class="compact-form asset-form" label-placement="top" @submit.prevent="submit">
+      <div class="asset-form__layout">
+        <section>
+          <n-form-item label="套餐 / 规格">
+            <n-input v-model:value="plan" maxlength="120" placeholder="例如 LAX.Pro.Pocket" />
+          </n-form-item>
+          <div class="form-grid">
+            <n-form-item label="购买日期">
+              <n-date-picker v-model:value="purchasedAt" type="date" clearable style="width: 100%" />
+            </n-form-item>
+            <n-form-item label="到期日期">
+              <n-date-picker v-model:value="expiresAt" type="date" clearable style="width: 100%" />
+            </n-form-item>
+          </div>
+          <n-form-item label="续费周期（月）">
+            <n-input-number v-model:value="renewalCycleMonths" :min="0" :max="120" style="width: 100%" />
+          </n-form-item>
+          <div class="switch-row switch-row--compact">
+            <div><strong>自动续费</strong></div>
+            <n-switch v-model:value="autoRenew" aria-label="自动续费" />
+          </div>
+        </section>
+        <section>
+          <n-form-item label="资产备注">
+            <n-input
+              v-model:value="notes"
+              type="textarea"
+              :autosize="{ minRows: 12, maxRows: 16 }"
+              maxlength="1000"
+              show-count
+              placeholder="套餐配置、账单号、续费备注等，可按行书写"
+            />
+          </n-form-item>
+        </section>
       </div>
     </n-form>
+    <template #footer>
+      <div class="modal-actions">
+        <n-button :disabled="saving" @click="emit('update:show', false)">取消</n-button>
+        <n-button type="primary" attr-type="submit" :loading="saving" @click="submit">保存资产档案</n-button>
+      </div>
+    </template>
   </n-modal>
 </template>
 
 <style scoped>
-.asset-modal { width: min(650px, calc(100vw - 28px)); }
-.asset-modal__grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 0 16px; }
-@media (max-width: 620px) { .asset-modal__grid { grid-template-columns: 1fr; } }
+.asset-form__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 4px 24px;
+}
+
+.asset-form__layout :deep(.n-input--textarea) {
+  min-height: 240px;
+}
+
+.asset-form__layout :deep(textarea) {
+  min-height: 240px;
+  line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+  .asset-form__layout {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

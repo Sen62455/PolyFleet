@@ -88,6 +88,22 @@ func TestOperationsLayerAPIs(t *testing.T) {
 	if subscription.TokenExpiresAt != nil || subscription.UserExpiresAt != nil {
 		t.Fatalf("subscription expiry was not cleared: %#v", subscription)
 	}
+	// Revoked history is retained, but filtered before count and pagination.
+	if _, err := app.store.DB().Exec("UPDATE subscription_tokens SET revoked_at = ? WHERE id = ?", time.Now().UnixMilli(), issued.Subscription.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []string{"current", "revoked"} {
+		response := app.request(t, http.MethodGet, "/api/v1/subscriptions?status="+status+"&limit=1", nil, "", "")
+		requireStatus(t, response, http.StatusOK)
+		decodeResponse(t, response, &page)
+		want := 0
+		if status == "revoked" {
+			want = 1
+		}
+		if page.Total != want || len(page.Subscriptions) != want {
+			t.Fatalf("%s: unexpected page %#v", status, page)
+		}
+	}
 
 	now := time.Now().UTC()
 	batchID := cryptoutil.NewID()

@@ -30,6 +30,7 @@ type nodeRequest struct {
 	TrafficLimitBytes  *int64              `json:"traffic_limit_bytes"`
 	TrafficResetDay    *int                `json:"traffic_reset_day"`
 	Enabled            *bool               `json:"enabled"`
+	ExitProxyID        *string             `json:"exit_proxy_id"`
 }
 
 type nodeTrafficCalibrationRequest struct {
@@ -134,6 +135,8 @@ type nodeResponse struct {
 	OnlineLastReportAt        *time.Time           `json:"online_last_report_at"`
 	LastSeenAt                *time.Time           `json:"last_seen_at"`
 	LastAppliedAt             *time.Time           `json:"last_applied_at"`
+	ExitProxyID               string               `json:"exit_proxy_id,omitempty"`
+	ExitProxy                 *exitProxyResponse   `json:"exit_proxy"`
 	CreatedAt                 time.Time            `json:"created_at"`
 	UpdatedAt                 time.Time            `json:"updated_at"`
 }
@@ -255,6 +258,11 @@ func (a *App) handleCreateNode(response http.ResponseWriter, request *http.Reque
 	}
 	now := time.Now().UTC()
 	trafficLimit, trafficResetDay := nodeTrafficBudgetValues(input, nil)
+	exitProxyID, _ := nodeExitProxyID(input, nil)
+	if message := a.validateStoredExitProxy(request, exitProxyID); message != "" {
+		a.writeError(response, request, http.StatusUnprocessableEntity, "validation_failed", message)
+		return
+	}
 	node, err := a.store.CreateNode(request.Context(), store.NewNode{
 		ID:                 cryptoutil.NewID(),
 		Name:               input.Name,
@@ -270,6 +278,7 @@ func (a *App) handleCreateNode(response http.ResponseWriter, request *http.Reque
 		VLESSReality:       requestedRealitySettings(input.Reality, nil),
 		TrafficLimitBytes:  trafficLimit,
 		TrafficResetDay:    trafficResetDay,
+		ExitProxyID:        exitProxyID,
 		Enabled:            enabled,
 		Now:                now,
 	})
@@ -313,6 +322,11 @@ func (a *App) handleUpdateNode(response http.ResponseWriter, request *http.Reque
 	}
 	now := time.Now().UTC()
 	trafficLimit, trafficResetDay := nodeTrafficBudgetValues(input, &current)
+	exitProxyID, _ := nodeExitProxyID(input, &current)
+	if message := a.validateStoredExitProxy(request, exitProxyID); message != "" {
+		a.writeError(response, request, http.StatusUnprocessableEntity, "validation_failed", message)
+		return
+	}
 	node, err := a.store.UpdateNode(request.Context(), current.ID, store.UpdateNode{
 		Name:               input.Name,
 		Provider:           input.Provider,
@@ -327,6 +341,7 @@ func (a *App) handleUpdateNode(response http.ResponseWriter, request *http.Reque
 		VLESSReality:       requestedRealitySettings(input.Reality, current.VLESSReality),
 		TrafficLimitBytes:  trafficLimit,
 		TrafficResetDay:    trafficResetDay,
+		ExitProxyID:        exitProxyID,
 		Enabled:            *input.Enabled,
 		Now:                now,
 	})
@@ -552,7 +567,7 @@ func (a *App) presentNode(node store.Node, now time.Time) nodeResponse {
 			MaterialReportedAt:     node.VLESSReality.MaterialReportedAt,
 		}
 	}
-	return nodeResponse{
+	result := nodeResponse{
 		ID: node.ID, Name: node.Name, Provider: node.Provider, Region: node.Region,
 		AdapterType: node.AdapterType, AdapterStatus: node.AdapterStatus,
 		AdapterVersion: node.AdapterVersion, AdapterErrorCode: node.AdapterErrorCode,
@@ -598,8 +613,14 @@ func (a *App) presentNode(node store.Node, now time.Time) nodeResponse {
 		OnlineConnections:         node.OnlineConnections, OnlineUnknownUsers: node.OnlineUnknownUsers,
 		OnlineSampledAt: node.OnlineSampledAt, OnlineLastReportAt: node.OnlineLastReportAt,
 		LastSeenAt: node.LastSeenAt, LastAppliedAt: node.LastAppliedAt,
-		CreatedAt: node.CreatedAt, UpdatedAt: node.UpdatedAt,
+		ExitProxyID: node.ExitProxyID,
+		CreatedAt:   node.CreatedAt, UpdatedAt: node.UpdatedAt,
 	}
+	if node.ExitProxy != nil {
+		presented := presentExitProxy(*node.ExitProxy)
+		result.ExitProxy = &presented
+	}
+	return result
 }
 
 func nodeTrafficBudgetValues(input nodeRequest, current *store.Node) (int64, int) {

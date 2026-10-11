@@ -43,6 +43,7 @@ const settings: NotificationSettings = {
     lead_days: 30,
     threshold_percent: 80,
     node_ids: [],
+    message_template: "请检查服务器\n{{details}}",
     last_run_at: null,
     last_success_at: null,
     last_result: "",
@@ -121,6 +122,8 @@ describe("NotificationDashboard", () => {
     expect(modal!.style.maxWidth).toBe("720px");
     expect(document.body.textContent).toContain("填写接收通知的目标，不是机器人用户名");
     expect(document.querySelector('.notifier-modal input[type="password"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="telegram-updates-api"]')?.textContent).toContain("https://api.telegram.org/bot<BotToken>/getUpdates");
+    expect(document.body.textContent).toContain("message.chat.id");
 
     const chatControl = document.querySelector<HTMLElement>('[data-testid="telegram-chat-id"]');
     const chatInput = chatControl?.matches("input") ? chatControl as HTMLInputElement : chatControl?.querySelector("input");
@@ -134,6 +137,35 @@ describe("NotificationDashboard", () => {
 
     expect(saveNotifier).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("不能填写机器人的用户名");
+    wrapper.unmount();
+  });
+
+  it("preserves custom content when editing and keeps required message fields read-only", async () => {
+    vi.spyOn(api, "getNotificationSettings").mockResolvedValue(settings);
+    vi.spyOn(api, "listNodes").mockResolvedValue([]);
+    const save = vi.spyOn(api, "saveNotificationReminderRule").mockResolvedValue(settings.reminder_rules[0]);
+    const host = defineComponent({
+      components: { NDialogProvider, NMessageProvider, NotificationDashboard },
+      template: '<n-dialog-provider><n-message-provider><notification-dashboard /></n-message-provider></n-dialog-provider>',
+    });
+    const wrapper = mount(host, { attachTo: document.body });
+    await flushPromises();
+    await wrapper.get('button[aria-label="编辑提醒"]').trigger('click');
+    await flushPromises();
+    const fixed = document.querySelector('[data-testid="reminder-fixed-fields"]')!;
+    expect(fixed.tagName).toBe('PRE');
+    expect(fixed.textContent).toContain('规则名称：每 6 小时运行概览');
+    expect(fixed.textContent).toContain('提醒频率：每 6 小时');
+    const control = document.querySelector('[data-testid="reminder-message-template"]')!;
+    const input = (control.matches('textarea') ? control : control.querySelector('textarea')) as HTMLTextAreaElement;
+    expect(input.value).toBe(settings.reminder_rules[0].message_template);
+    input.value = '请处理\n{{details}}\n{{time}}';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+    expect(document.querySelector('[data-testid="reminder-message-preview"]')?.textContent).toContain('请处理');
+    document.querySelector('[data-testid="reminder-form"]')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'rule-1', message_template: input.value }));
     wrapper.unmount();
   });
 });

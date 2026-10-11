@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type NotificationReminderRule struct {
@@ -21,6 +22,7 @@ type NotificationReminderRule struct {
 	LeadDays         int
 	ThresholdPercent int
 	NodeIDs          []string
+	MessageTemplate  string
 	LastRunAt        *time.Time
 	LastSuccessAt    *time.Time
 	LastResult       string
@@ -45,7 +47,7 @@ const reminderRuleColumns = `
 	r.id, r.name, r.notifier_id, n.name, r.kind, r.enabled,
 	r.interval_minutes, r.lead_days, r.threshold_percent, r.node_ids,
 	r.last_run_at, r.last_success_at, r.last_result, r.last_error,
-	r.next_run_at, r.created_at, r.updated_at
+	r.next_run_at, r.created_at, r.updated_at, r.message_template
 `
 
 func scanNotificationReminderRule(row rowScanner) (NotificationReminderRule, error) {
@@ -58,7 +60,7 @@ func scanNotificationReminderRule(row rowScanner) (NotificationReminderRule, err
 		&rule.ID, &rule.Name, &rule.NotifierID, &rule.NotifierName, &rule.Kind,
 		&enabled, &rule.IntervalMinutes, &rule.LeadDays, &rule.ThresholdPercent,
 		&nodeIDs, &lastRunAt, &lastSuccessAt, &rule.LastResult, &rule.LastError,
-		&nextRunAt, &createdAt, &updatedAt,
+		&nextRunAt, &createdAt, &updatedAt, &rule.MessageTemplate,
 	); err != nil {
 		return NotificationReminderRule{}, err
 	}
@@ -120,6 +122,12 @@ func normalizeReminderRule(rule NotificationReminderRule) (NotificationReminderR
 	rule.Name = strings.TrimSpace(rule.Name)
 	rule.NotifierID = strings.TrimSpace(rule.NotifierID)
 	rule.Kind = strings.TrimSpace(strings.ToLower(rule.Kind))
+	rule.MessageTemplate = strings.TrimSpace(rule.MessageTemplate)
+	remaining := strings.NewReplacer("{{details}}", "", "{{time}}", "").Replace(rule.MessageTemplate)
+	if utf8.RuneCountInString(rule.MessageTemplate) > 2000 ||
+		strings.Contains(remaining, "{{") || strings.Contains(remaining, "}}") {
+		return rule, ErrUnsupported
+	}
 	if rule.ID == "" || rule.Name == "" || len(rule.Name) > 80 || rule.NotifierID == "" {
 		return rule, ErrUnsupported
 	}
@@ -183,8 +191,8 @@ func (s *Store) UpsertNotificationReminderRule(
 	if _, err := s.db.ExecContext(ctx, `
 		INSERT INTO notification_reminder_rules(
 			id, name, notifier_id, kind, enabled, interval_minutes, lead_days,
-			threshold_percent, node_ids, next_run_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			threshold_percent, node_ids, next_run_at, created_at, updated_at, message_template
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name = excluded.name,
 			notifier_id = excluded.notifier_id,
@@ -199,10 +207,11 @@ func (s *Store) UpsertNotificationReminderRule(
 			lead_days = excluded.lead_days,
 			threshold_percent = excluded.threshold_percent,
 			node_ids = excluded.node_ids,
+			message_template = excluded.message_template,
 			updated_at = excluded.updated_at
 	`, rule.ID, rule.Name, rule.NotifierID, rule.Kind, boolInt(rule.Enabled),
 		rule.IntervalMinutes, rule.LeadDays, rule.ThresholdPercent, string(encodedNodeIDs),
-		nextRunAt.UnixMilli(), now.UnixMilli(), now.UnixMilli()); err != nil {
+		nextRunAt.UnixMilli(), now.UnixMilli(), now.UnixMilli(), rule.MessageTemplate); err != nil {
 		return NotificationReminderRule{}, fmt.Errorf("upsert notification reminder rule: %w", err)
 	}
 	return s.GetNotificationReminderRule(ctx, rule.ID)

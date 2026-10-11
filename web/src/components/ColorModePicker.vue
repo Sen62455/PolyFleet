@@ -11,9 +11,9 @@ import {
 const open = ref(false);
 const options: Array<{ value: ColorModePreference; label: string; description: string }> = [
   { value: "system", label: "跟随系统", description: "随设备外观自动切换" },
-  { value: "light", label: "明亮", description: "灰白高对比界面" },
-  { value: "dark", label: "深色", description: "蓝灰低光控制台" },
-  { value: "eye", label: "护眼", description: "柔和灰绿低对比界面" },
+  { value: "light", label: "明亮", description: "清爽灰白与靛青强调" },
+  { value: "dark", label: "深色", description: "深海蓝灰与柔和亮色" },
+  { value: "eye", label: "护眼", description: "宣纸底色，久看不累" },
 ];
 const activeOption = computed(() =>
   options.find((item) => item.value === colorModePreference.value) ?? options[0],

@@ -207,7 +207,7 @@ func (s *Store) ListSubscriptionOperations(
 	}
 	filter.Status = strings.TrimSpace(strings.ToLower(filter.Status))
 	validStatuses := map[string]bool{
-		"": true, "all": true, "active": true, "expiring": true,
+		"": true, "all": true, "current": true, "active": true, "expiring": true,
 		"exhausted": true, "expired": true, "revoked": true, "disabled": true,
 	}
 	if !validStatuses[filter.Status] {
@@ -218,7 +218,9 @@ func (s *Store) ListSubscriptionOperations(
 	baseArgs := []any{now, now, cutoff, cutoff}
 	where := []string{"1 = 1"}
 	args := append([]any(nil), baseArgs...)
-	if filter.Status != "" && filter.Status != "all" {
+	if filter.Status == "current" {
+		where = append(where, "revoked_at IS NULL")
+	} else if filter.Status != "" && filter.Status != "all" {
 		where = append(where, "operation_status = ?")
 		args = append(args, filter.Status)
 	}

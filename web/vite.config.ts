@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "../internal/webui/dist",
+      // Keep font subsets on the same origin; the deployed CSP disallows data: fonts.
+      assetsInlineLimit: 0,
       emptyOutDir: true,
       sourcemap: false,
     },

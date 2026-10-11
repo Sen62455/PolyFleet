@@ -58,6 +58,7 @@ type SubscriptionEndpoint struct {
 	Network            string
 	RealityPublicKey   string
 	RealityShortID     string
+	Exit               *SubscriptionExitProxy
 }
 
 type Subscription struct {
@@ -308,11 +309,16 @@ func (s *Store) ResolveSubscription(
 		       n.tls_insecure,
 		       n.tls_cert_fingerprint, n.tls_public_key_sha256,
 		       c.id, c.protocol, c.secret_ciphertext, c.key_version,
-		       COALESCE(r.public_key, ''), COALESCE(r.short_id, '')
+		       COALESCE(r.public_key, ''), COALESCE(r.short_id, ''),
+		       COALESCE(n.exit_proxy_id, ''), COALESCE(p.name, ''), COALESCE(p.kind, ''),
+		       COALESCE(p.protocol, ''), COALESCE(p.host, ''), COALESCE(p.port, 0),
+		       COALESCE(p.username, ''), p.password_ciphertext,
+		       COALESCE(p.tls, 0), COALESCE(p.skip_cert_verify, 0), COALESCE(p.udp, 0), COALESCE(p.server_side, 0)
 		FROM node_user_assignments a
 		JOIN nodes n ON n.id = a.node_id
 		JOIN user_credentials c ON c.id = a.applied_credential_id
 		LEFT JOIN node_vless_reality r ON r.node_id = n.id
+		LEFT JOIN exit_proxies p ON p.id = n.exit_proxy_id
 		WHERE a.user_id = ? AND n.archived_at IS NULL
 		  AND n.adapter_type IN (
 		      'native_hysteria2', 's_ui', 'sing_box_vless_reality'
@@ -344,6 +350,9 @@ func (s *Store) ResolveSubscription(
 		var credentialID, credentialProtocol string
 		var ciphertext []byte
 		var keyVersion, tlsInsecure int
+		var exitID, exitName, exitKind, exitProtocol, exitHost, exitUsername string
+		var exitPort, exitTLS, exitSkipCert, exitUDP, exitServerSide int
+		var exitPassword []byte
 		if err := rows.Scan(
 			&endpoint.NodeID, &endpoint.NodeName, &endpoint.AdapterType,
 			&endpoint.PublicHost,
@@ -351,6 +360,8 @@ func (s *Store) ResolveSubscription(
 			&endpoint.TLSCertFingerprint, &endpoint.TLSPublicKeySHA256,
 			&credentialID, &credentialProtocol, &ciphertext, &keyVersion,
 			&endpoint.RealityPublicKey, &endpoint.RealityShortID,
+			&exitID, &exitName, &exitKind, &exitProtocol, &exitHost, &exitPort,
+			&exitUsername, &exitPassword, &exitTLS, &exitSkipCert, &exitUDP, &exitServerSide,
 		); err != nil {
 			_ = rows.Close()
 			return Subscription{}, fmt.Errorf("scan subscription endpoint: %w", err)
@@ -373,6 +384,19 @@ func (s *Store) ResolveSubscription(
 			endpoint.Network = "tcp"
 		}
 		endpoint.Credential = string(secret)
+		if exitID != "" {
+			password, err := openExitProxyPassword(masterKey, exitPassword, exitID)
+			if err != nil {
+				_ = rows.Close()
+				return Subscription{}, err
+			}
+			endpoint.Exit = &SubscriptionExitProxy{
+				ServerSide: exitServerSide == 1,
+				ID:         exitID, Name: exitName, Kind: exitKind, Protocol: exitProtocol,
+				Host: exitHost, Port: exitPort, Username: exitUsername, Password: password,
+				TLS: exitTLS == 1, SkipCertVerify: exitSkipCert == 1, UDP: exitUDP == 1,
+			}
+		}
 		endpoints = append(endpoints, endpoint)
 	}
 	if err := rows.Err(); err != nil {

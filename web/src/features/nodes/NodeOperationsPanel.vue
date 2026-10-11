@@ -229,16 +229,18 @@ watch(
     <div class="operations-toolbar" aria-label="节点运维操作">
       <n-tooltip trigger="hover">
         <template #trigger>
-          <n-button circle secondary :loading="working === 'probe_core'" aria-label="探测核心" @click="createOperation('probe_core')">
+          <n-button size="small" secondary :loading="working === 'probe_core'" aria-label="探测核心" @click="createOperation('probe_core')">
             <template #icon><n-icon><activity /></n-icon></template>
+          探测核心
           </n-button>
         </template>
         探测核心
       </n-tooltip>
       <n-tooltip trigger="hover">
         <template #trigger>
-          <n-button circle secondary :loading="working === 'restart_core'" aria-label="重启核心" @click="restartCore">
+          <n-button size="small" secondary :loading="working === 'restart_core'" aria-label="重启核心" @click="restartCore">
             <template #icon><n-icon><rotate-cw /></n-icon></template>
+          重启核心
           </n-button>
         </template>
         重启核心
@@ -246,7 +248,7 @@ watch(
       <n-tooltip trigger="hover">
         <template #trigger>
           <n-button
-            circle
+            size="small"
             secondary
             :disabled="node.adapter_type === 'sing_box_vless_reality'"
             :loading="working === 'tail_core_log'"
@@ -254,6 +256,7 @@ watch(
             @click="createOperation('tail_core_log')"
           >
             <template #icon><n-icon><scroll-text /></n-icon></template>
+          读取日志
           </n-button>
         </template>
         {{ node.adapter_type === "sing_box_vless_reality" ? "Reality 日志读取已禁用" : "最近 100 行日志" }}
@@ -261,7 +264,7 @@ watch(
       <n-tooltip trigger="hover">
         <template #trigger>
           <n-button
-            circle
+            size="small"
             secondary
             :disabled="node.adapter_type === 's_ui'"
             :loading="working === 'backup_config'"
@@ -269,6 +272,7 @@ watch(
             @click="createOperation('backup_config')"
           >
             <template #icon><n-icon><archive /></n-icon></template>
+          备份配置
           </n-button>
         </template>
         {{ node.adapter_type === "s_ui" ? "S-UI 数据库不做在线文件复制" : "备份核心配置" }}
@@ -276,7 +280,7 @@ watch(
       <n-tooltip v-if="node.adapter_type === 'sing_box_vless_reality'" trigger="hover">
         <template #trigger>
           <n-button
-            circle
+            size="small"
             secondary
             :disabled="!canRotateRealityIdentity"
             :loading="working === 'reality-identity'"
@@ -284,6 +288,7 @@ watch(
             @click="rotateRealityIdentity"
           >
             <template #icon><n-icon><key-round /></n-icon></template>
+          轮换身份
           </n-button>
         </template>
         {{ canRotateRealityIdentity ? "轮换 Reality 身份" : "等待当前身份与配置完成应用" }}
@@ -321,7 +326,7 @@ watch(
           开始 Ping
         </n-button>
       </div>
-      <small>固定发送 4 个 ICMP 请求，每次等待不超过 2 秒；目标默认是 42.49.64.154。</small>
+      <small>固定发送 4 个 ICMP 请求，每次等待不超过 2 秒；请输入要测量的目标 IP。</small>
     </div>
 
     <div v-if="loading" class="operations-state"><n-spin :size="22" /></div>

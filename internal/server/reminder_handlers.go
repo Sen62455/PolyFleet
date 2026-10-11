@@ -27,6 +27,7 @@ type notificationReminderRuleRequest struct {
 	LeadDays         int      `json:"lead_days"`
 	ThresholdPercent int      `json:"threshold_percent"`
 	NodeIDs          []string `json:"node_ids"`
+	MessageTemplate  *string  `json:"message_template"`
 }
 
 type notificationReminderRuleResponse struct {
@@ -40,6 +41,7 @@ type notificationReminderRuleResponse struct {
 	LeadDays         int        `json:"lead_days"`
 	ThresholdPercent int        `json:"threshold_percent"`
 	NodeIDs          []string   `json:"node_ids"`
+	MessageTemplate  string     `json:"message_template"`
 	LastRunAt        *time.Time `json:"last_run_at"`
 	LastSuccessAt    *time.Time `json:"last_success_at"`
 	LastResult       string     `json:"last_result"`
@@ -64,7 +66,8 @@ func presentNotificationReminderRule(rule store.NotificationReminderRule) notifi
 		NotifierName: rule.NotifierName, Kind: rule.Kind, Enabled: rule.Enabled,
 		IntervalMinutes: rule.IntervalMinutes, LeadDays: rule.LeadDays,
 		ThresholdPercent: rule.ThresholdPercent, NodeIDs: rule.NodeIDs,
-		LastRunAt: rule.LastRunAt, LastSuccessAt: rule.LastSuccessAt,
+		MessageTemplate: rule.MessageTemplate,
+		LastRunAt:       rule.LastRunAt, LastSuccessAt: rule.LastSuccessAt,
 		LastResult: rule.LastResult, LastError: rule.LastError,
 		NextRunAt: rule.NextRunAt, CreatedAt: rule.CreatedAt, UpdatedAt: rule.UpdatedAt,
 	}
@@ -84,6 +87,17 @@ func (a *App) handlePutNotificationReminderRule(response http.ResponseWriter, re
 		a.writeError(response, request, http.StatusBadRequest, "invalid_request", "invalid reminder rule")
 		return
 	}
+	messageTemplate := ""
+	if input.MessageTemplate != nil {
+		messageTemplate = *input.MessageTemplate
+	} else if strings.TrimSpace(input.ID) != "" {
+		previous, err := a.store.GetNotificationReminderRule(request.Context(), input.ID)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			a.writeError(response, request, http.StatusInternalServerError, "reminder_read_failed", "could not read reminder rule")
+			return
+		}
+		messageTemplate = previous.MessageTemplate
+	}
 	if strings.TrimSpace(input.ID) == "" {
 		input.ID = cryptoutil.NewID()
 	}
@@ -95,14 +109,14 @@ func (a *App) handlePutNotificationReminderRule(response http.ResponseWriter, re
 		ID: input.ID, Name: input.Name, NotifierID: input.NotifierID,
 		Kind: input.Kind, Enabled: enabled, IntervalMinutes: input.IntervalMinutes,
 		LeadDays: input.LeadDays, ThresholdPercent: input.ThresholdPercent,
-		NodeIDs: input.NodeIDs,
+		NodeIDs: input.NodeIDs, MessageTemplate: messageTemplate,
 	}, time.Now().UTC())
 	if errors.Is(err, store.ErrNotFound) {
 		a.writeError(response, request, http.StatusNotFound, "reminder_target_not_found", "notification channel or node not found")
 		return
 	}
 	if errors.Is(err, store.ErrUnsupported) {
-		a.writeError(response, request, http.StatusUnprocessableEntity, "validation_failed", "invalid reminder rule fields")
+		a.writeError(response, request, http.StatusUnprocessableEntity, "validation_failed", "请检查提醒规则字段；正文最多 2000 字，仅支持 {{details}} 和 {{time}} 占位符")
 		return
 	}
 	if err != nil {
@@ -255,6 +269,7 @@ func (a *App) executeNotificationReminder(
 	if !shouldSend {
 		return false, resultText, nil
 	}
+	message = formatNotificationReminderMessage(rule, message, now)
 	notifier, err := a.store.GetNotificationNotifier(ctx, rule.NotifierID)
 	if err != nil {
 		return false, "读取通知通道失败", err
@@ -272,6 +287,34 @@ func (a *App) executeNotificationReminder(
 		return false, "发送失败", err
 	}
 	return true, resultText, nil
+}
+
+func formatNotificationReminderMessage(rule store.NotificationReminderRule, details string, now time.Time) string {
+	labels := map[string]string{
+		"fleet_summary": "周期运行概览", "active_alerts": "活动告警重复提醒",
+		"asset_expiry": "VPS 到期预警", "traffic_usage": "节点流量阈值",
+	}
+	body := details
+	if rule.MessageTemplate != "" {
+		body = strings.NewReplacer("{{details}}", details, "{{time}}", now.UTC().Format("2006-01-02 15:04 UTC")).Replace(rule.MessageTemplate)
+	}
+	// Required metadata is generated separately from the editable message body.
+	name := strings.Join(strings.Fields(rule.Name), " ")
+	return fmt.Sprintf("规则名称：%s\n提醒类型：%s\n提醒频率：%s\n\n%s",
+		name, labels[rule.Kind], reminderIntervalLabel(rule.IntervalMinutes), body)
+}
+
+func reminderIntervalLabel(minutes int) string {
+	if minutes == 10080 {
+		return "每周"
+	}
+	if minutes == 1440 {
+		return "每天"
+	}
+	if minutes%60 == 0 {
+		return fmt.Sprintf("每 %d 小时", minutes/60)
+	}
+	return fmt.Sprintf("每 %d 分钟", minutes)
 }
 
 func (a *App) renderNotificationReminder(

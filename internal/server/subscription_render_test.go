@@ -12,6 +12,45 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func TestServerSideExitExportsOnlyEntryAndIncludesHandshakeTiming(t *testing.T) {
+	s := store.Subscription{Endpoints: []store.SubscriptionEndpoint{{
+		NodeName: "entry", Protocol: "hysteria2", PublicHost: "entry.example.com", PublicPort: 443, Credential: "user-secret",
+		Exit: &store.SubscriptionExitProxy{Name: "landing", Host: "private-landing.example.com", Port: 1080, Password: "never-export-this", ServerSide: true},
+	}}}
+	for _, format := range []string{"clash", "sing-box", "uri", "base64"} {
+		r, err := renderSubscription(format, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := r.Body
+		if format == "base64" {
+			body, err = base64.StdEncoding.DecodeString(string(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if bytes.Contains(body, []byte("never-export-this")) || bytes.Contains(body, []byte("private-landing")) || bytes.Contains(body, []byte("dialer-proxy")) || bytes.Contains(body, []byte("detour")) {
+			t.Fatalf("%s exported a client chain: %s", format, body)
+		}
+		if format == "clash" {
+			var v struct {
+				Unified bool              `yaml:"unified-delay"`
+				Proxies []map[string]any  `yaml:"proxies"`
+				Groups  []clashProxyGroup `yaml:"proxy-groups"`
+			}
+			if err := yaml.Unmarshal(body, &v); err != nil {
+				t.Fatal(err)
+			}
+			if v.Unified || len(v.Proxies) != 1 || v.Proxies[0]["name"] != "entry · landing" || v.Proxies[0]["type"] != "hysteria2" || v.Groups[0].Proxies[1] != "entry · landing" {
+				t.Fatalf("invalid server-forwarded config: %s", body)
+			}
+		}
+	}
+	if s.Endpoints[0].Exit == nil || s.Endpoints[0].NodeName != "entry" {
+		t.Fatal("renderer mutated caller subscription")
+	}
+}
+
 func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 	certificateFingerprint := strings.TrimSuffix(strings.Repeat("AB:", 32), ":")
 	publicKeyPin := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x42}, 32))
@@ -140,6 +179,73 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		len(singBoxValue.Outbounds[0].TLS.CertificatePublicKeySHA256) != 1 ||
 		singBoxValue.Outbounds[0].TLS.CertificatePublicKeySHA256[0] != publicKeyPin {
 		t.Fatalf("unexpected sing-box subscription: %#v", singBoxValue)
+	}
+}
+
+func TestSubscriptionRenderersChainExitProxiesThroughEntryNodes(t *testing.T) {
+	subscription := store.Subscription{Endpoints: []store.SubscriptionEndpoint{
+		{
+			NodeID: "node-hy2", NodeName: "LA entry", Protocol: "hysteria2",
+			PublicHost: "hy2.example.com", PublicPort: 443, SNI: "hy2.example.com",
+			Credential: "hy2-password",
+			Exit: &store.SubscriptionExitProxy{
+				Name: "UK landing", Kind: store.ExitProxyKindLandingVPS,
+				Protocol: store.ExitProxyProtocolSOCKS5, Host: "203.0.113.9", Port: 1080,
+				Username: "polyfleet", Password: "landing-secret", UDP: true,
+			},
+		},
+		{
+			NodeID: "node-direct", NodeName: "Direct node", Protocol: "hysteria2",
+			PublicHost: "direct.example.com", PublicPort: 443, Credential: "direct-password",
+		},
+	}}
+	clash, err := renderSubscription("clash", subscription)
+	if err != nil {
+		t.Fatalf("renderSubscription(clash) error = %v", err)
+	}
+	var clashValue struct {
+		Proxies     []map[string]any `yaml:"proxies"`
+		ProxyGroups []struct {
+			Name    string   `yaml:"name"`
+			Proxies []string `yaml:"proxies"`
+		} `yaml:"proxy-groups"`
+	}
+	if err := yaml.Unmarshal(clash.Body, &clashValue); err != nil {
+		t.Fatalf("yaml.Unmarshal() error = %v; body = %s", err, clash.Body)
+	}
+	if len(clashValue.Proxies) != 3 {
+		t.Fatalf("proxies = %#v", clashValue.Proxies)
+	}
+	var foundChain bool
+	for _, proxy := range clashValue.Proxies {
+		if proxy["name"] == "LA entry · UK landing" {
+			foundChain = true
+			if proxy["type"] != "socks5" || proxy["server"] != "203.0.113.9" ||
+				proxy["dialer-proxy"] != "LA entry" || proxy["password"] != "landing-secret" {
+				t.Fatalf("chained proxy = %#v", proxy)
+			}
+		}
+	}
+	if !foundChain || clashValue.ProxyGroups[0].Proxies[1] != "LA entry · UK landing" ||
+		clashValue.ProxyGroups[0].Proxies[2] != "Direct node" {
+		t.Fatalf("clash groups = %#v", clashValue.ProxyGroups)
+	}
+
+	singBox, err := renderSubscription("sing-box", subscription)
+	if err != nil {
+		t.Fatalf("renderSubscription(sing-box) error = %v", err)
+	}
+	var singBoxValue struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(singBox.Body, &singBoxValue); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v; body = %s", err, singBox.Body)
+	}
+	if len(singBoxValue.Outbounds) != 3 ||
+		singBoxValue.Outbounds[0]["tag"] != "LA entry · UK landing" ||
+		singBoxValue.Outbounds[0]["detour"] != "LA entry" ||
+		singBoxValue.Outbounds[0]["type"] != "socks" {
+		t.Fatalf("sing-box outbounds = %#v", singBoxValue.Outbounds)
 	}
 }
 

@@ -58,6 +58,11 @@ describe("SubscriptionDashboard", () => {
     const wrapper = mountDashboard();
     await flushPromises();
 
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "current", offset: 0 }));
+    const revokedFilter = wrapper.findAll(".ops-segments button").find((button) => button.text() === "已吊销");
+    await revokedFilter!.trigger("click");
+    await flushPromises();
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "revoked", offset: 0 }));
     expect(wrapper.text()).toContain("Alice");
     expect(wrapper.text()).toContain("50.0 GiB");
     expect(wrapper.text()).toContain("/ 100 GiB · 50%");

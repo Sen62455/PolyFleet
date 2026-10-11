@@ -16,7 +16,8 @@ import {
   useMessage,
 } from "naive-ui";
 import { api, APIError } from "../../api";
-import { formatBytes, relativeTime } from "../../lib/format";
+import StatCard from "../../components/StatCard.vue";
+import { formatBytes, percent, relativeTime, severity } from "../../lib/format";
 import type { SubscriptionOperationRecord, SubscriptionOperationStatus } from "../../types";
 
 const emit = defineEmits<{ "session-expired": [] }>();
@@ -27,7 +28,7 @@ const total = ref(0);
 const loading = ref(true);
 const refreshing = ref(false);
 const search = ref("");
-const status = ref<"all" | SubscriptionOperationStatus>("all");
+const status = ref<"current" | SubscriptionOperationStatus>("current");
 const offset = ref(0);
 const pageSize = 50;
 const editing = ref<SubscriptionOperationRecord | null>(null);
@@ -36,8 +37,8 @@ const tokenExpiresAt = ref<number | null>(null);
 const userExpiresAt = ref<number | null>(null);
 const quotaGiB = ref<number | null>(null);
 
-const filters: Array<{ value: "all" | SubscriptionOperationStatus; label: string }> = [
-  { value: "all", label: "全部" },
+const filters: Array<{ value: "current" | SubscriptionOperationStatus; label: string }> = [
+  { value: "current", label: "未吊销" },
   { value: "active", label: "活跃" },
   { value: "expiring", label: "即将到期" },
   { value: "exhausted", label: "额度用尽" },
@@ -140,8 +141,7 @@ function revoke(item: SubscriptionOperationRecord) {
 }
 
 function quotaPercent(item: SubscriptionOperationRecord) {
-  if (!item.traffic_limit_bytes) return 0;
-  return Math.min(100, Math.round((item.traffic_used_bytes / item.traffic_limit_bytes) * 100));
+  return percent(item.traffic_used_bytes, item.traffic_limit_bytes);
 }
 
 function expiry(item: SubscriptionOperationRecord) {
@@ -154,36 +154,55 @@ function statusLabel(value: SubscriptionOperationStatus) {
   return ({ active: "活跃", expiring: "即将到期", exhausted: "额度用尽", expired: "已到期", revoked: "已吊销", disabled: "用户停用" })[value];
 }
 
+function statusTone(value: SubscriptionOperationStatus) {
+  return ({ active: "signal", expiring: "pressure", exhausted: "critical", expired: "critical", revoked: "critical", disabled: "neutral" })[value];
+}
+
 onMounted(() => load());
 </script>
 
 <template>
   <main class="workspace operations-workspace subscription-workspace">
     <div class="page-heading page-heading--console">
-      <div><span class="page-eyebrow">SUBSCRIPTION OPERATIONS</span><h2>订阅运营</h2><p>额度、有效期和最近使用集中在一张运营总账中</p></div>
+      <div><h2>订阅运营</h2><p>额度、有效期和最近使用集中在一张运营总账中</p></div>
       <n-tooltip trigger="hover">
         <template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新订阅" @click="load()"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>
         刷新
       </n-tooltip>
     </div>
 
-    <section class="ops-register" aria-label="订阅摘要">
-      <div><span><key-round :size="15" />订阅总数</span><strong>{{ total }}</strong><small>当前筛选 {{ subscriptions.length }} 条</small></div>
-      <div><span><users-round :size="15" />活跃订阅</span><strong>{{ activeCount }}</strong><small>本页可正常使用</small></div>
-      <div><span><calendar-clock :size="15" />需处理</span><strong :class="{ 'is-warning': attentionCount }">{{ attentionCount }}</strong><small>临期、到期或额度用尽</small></div>
-      <div><span><gauge :size="15" />双向用量</span><strong>{{ formatBytes(usedBytes) }}</strong><small>{{ limitedBytes ? `共 ${formatBytes(limitedBytes)} 配额` : "未设置配额" }}</small></div>
+    <section class="stat-grid" aria-label="订阅摘要">
+      <stat-card label="订阅总数">
+        <template #icon><key-round :size="18" /></template>
+        {{ total }}
+        <template #hint>当前筛选 {{ subscriptions.length }} 条</template>
+      </stat-card>
+      <stat-card label="活跃订阅" tone="signal">
+        <template #icon><users-round :size="18" /></template>
+        {{ activeCount }}
+        <template #hint>本页可正常使用</template>
+      </stat-card>
+      <stat-card label="需处理" :tone="attentionCount ? 'pressure' : 'neutral'" :muted="!attentionCount">
+        <template #icon><calendar-clock :size="18" /></template>
+        {{ attentionCount }}
+        <template #hint>临期、到期或额度用尽</template>
+      </stat-card>
+      <stat-card label="双向用量">
+        <template #icon><gauge :size="18" /></template>
+        {{ formatBytes(usedBytes) }}
+        <template #hint>{{ limitedBytes ? `共 ${formatBytes(limitedBytes)} 配额` : "未设置配额" }}</template>
+      </stat-card>
     </section>
 
-    <section class="ops-toolbar">
-      <n-input v-model:value="search" clearable placeholder="搜索用户、订阅名或 Token 前缀" @keyup.enter="offset = 0; load()">
-        <template #prefix><n-icon><search-icon :size="15" /></n-icon></template>
-      </n-input>
-      <div class="ops-segments" role="tablist" aria-label="订阅状态">
-        <button v-for="item in filters" :key="item.value" type="button" :class="{ 'is-active': status === item.value }" @click="setFilter(item.value)">{{ item.label }}</button>
-      </div>
-    </section>
-
-    <section class="ops-surface" aria-label="订阅列表">
+    <section class="ops-surface subscription-ledger" aria-label="订阅列表">
+      <header class="ops-toolbar" aria-label="订阅筛选">
+        <n-input v-model:value="search" clearable placeholder="搜索用户、订阅名或 Token 前缀" @keyup.enter="offset = 0; load()">
+          <template #prefix><n-icon><search-icon :size="15" /></n-icon></template>
+        </n-input>
+        <div class="ops-segments" role="tablist" aria-label="订阅状态">
+          <button v-for="item in filters" :key="item.value" type="button" :class="{ 'is-active': status === item.value }" @click="setFilter(item.value)">{{ item.label }}</button>
+        </div>
+      </header>
       <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
       <div v-else-if="subscriptions.length === 0" class="surface-state surface-state--empty"><key-round :size="26" /><strong>没有符合条件的订阅</strong></div>
       <div v-else class="ops-table-wrap">
@@ -192,8 +211,12 @@ onMounted(() => load());
           <tbody>
             <tr v-for="item in subscriptions" :key="item.token_id">
               <td><strong>{{ item.name || "默认订阅" }}</strong><small>{{ item.display_name || item.username }} · {{ item.token_prefix }}...</small></td>
-              <td><span class="ops-status" :class="`is-${item.status}`">{{ statusLabel(item.status) }}</span><small>{{ item.allowed_formats.join(" / ") }}</small></td>
-              <td class="subscription-table__traffic"><strong>{{ formatBytes(item.traffic_used_bytes) }}</strong><small>{{ item.traffic_limit_bytes ? `/ ${formatBytes(item.traffic_limit_bytes)} · ${quotaPercent(item)}%` : "不限量" }}</small><i><span :style="{ width: `${quotaPercent(item)}%` }" /></i></td>
+              <td><span class="pill" :class="`pill--${statusTone(item.status)}`">{{ statusLabel(item.status) }}</span><small>{{ item.allowed_formats.join(" / ") }}</small></td>
+              <td class="subscription-table__traffic">
+                <strong>{{ formatBytes(item.traffic_used_bytes) }}</strong>
+                <small>{{ item.traffic_limit_bytes ? `/ ${formatBytes(item.traffic_limit_bytes)} · ${quotaPercent(item).toFixed(0)}%` : "不限量" }}</small>
+                <i v-if="item.traffic_limit_bytes" :class="`is-${item.status === 'exhausted' ? 'critical' : severity(quotaPercent(item))}`"><span :style="{ width: `${quotaPercent(item)}%` }" /></i>
+              </td>
               <td><strong>{{ expiry(item) }}</strong><small>Token / 用户取较早值</small></td>
               <td><strong>{{ relativeTime(item.last_used_at || item.last_traffic_at) }}</strong><small>{{ item.last_used_at ? "订阅已拉取" : "尚未拉取" }}</small></td>
               <td><strong>{{ item.online_nodes }} / {{ item.assignment_count }}</strong><small>在线 / 已分配</small></td>
@@ -232,10 +255,12 @@ onMounted(() => load());
 .subscription-workspace { display: grid; gap: 20px; }
 .subscription-table th:first-child { width: 20%; }
 .subscription-table td strong, .subscription-table td small { display: block; }
-.subscription-table td > small { margin-top: 5px; color: var(--hf-muted); font-size: 10px; }
-.subscription-table__traffic i { display: block; width: 120px; height: 2px; margin-top: 9px; background: var(--hf-line); }
-.subscription-table__traffic i span { display: block; height: 100%; background: var(--hf-accent); }
+.subscription-table td > small { margin-top: 5px; color: var(--hf-muted); font-size: 12px; }
+.subscription-table__traffic i { display: block; width: 120px; height: 4px; margin-top: 6px; overflow: hidden; border-radius: var(--hf-radius-pill); background: var(--hf-line); }
+.subscription-table__traffic i span { display: block; height: 100%; border-radius: inherit; background: var(--hf-accent); }
+.subscription-table__traffic i.is-warning span { background: var(--hf-pressure); }
+.subscription-table__traffic i.is-critical span { background: var(--hf-critical); }
 .subscription-edit-modal__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.subscription-edit-modal__quick { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; color: var(--hf-muted); font-size: 11px; }
+.subscription-edit-modal__quick { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; color: var(--hf-muted); font-size: 12px; }
 @media (max-width: 760px) { .subscription-edit-modal__grid { grid-template-columns: 1fr; gap: 0; } }
 </style>

@@ -120,6 +120,8 @@ export interface NodeRecord {
   online_last_report_at: string | null;
   last_seen_at: string | null;
   last_applied_at: string | null;
+  exit_proxy_id?: string;
+  exit_proxy?: ExitProxyRecord | null;
   created_at: string;
   updated_at: string;
 }
@@ -206,6 +208,71 @@ export interface NodeInput {
   traffic_limit_bytes?: number;
   traffic_reset_day?: number;
   enabled?: boolean;
+  exit_proxy_id?: string;
+}
+
+export type ExitProxyKind = "rented_ip" | "landing_vps";
+export type ExitProxyProtocol = "socks5" | "http";
+
+export interface ExitProxyAssignment {
+  node_id: string;
+  node_name: string;
+  public_host: string;
+}
+
+export interface ExitProxyRecord {
+  server_side?: boolean;
+  id: string;
+  name: string;
+  kind: ExitProxyKind;
+  protocol: ExitProxyProtocol;
+  host: string;
+  port: number;
+  username: string;
+  password_set: boolean;
+  tls: boolean;
+  skip_cert_verify: boolean;
+  udp: boolean;
+  notes: string;
+  assignments: ExitProxyAssignment[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExitProxyInput {
+  server_side?: boolean;
+  name: string;
+  kind: ExitProxyKind;
+  protocol: ExitProxyProtocol;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  tls?: boolean;
+  skip_cert_verify?: boolean;
+  udp?: boolean;
+  notes?: string;
+  node_ids?: string[];
+}
+
+export interface LandingGuideStep {
+  title: string;
+  where: string;
+  expected: string;
+  body: string;
+  filename?: string;
+  copy: string;
+}
+
+export interface LandingGuide {
+  proxy_id: string;
+  name: string;
+  kind: ExitProxyKind;
+  protocol: ExitProxyProtocol;
+  listen: string;
+  username: string;
+  allow_from: string[];
+  steps: LandingGuideStep[];
 }
 
 export interface EnrollmentToken {
@@ -622,6 +689,7 @@ export type NotificationReminderKind =
   | "traffic_usage";
 
 export interface NotificationReminderRuleRecord {
+	message_template: string;
   id: string;
   name: string;
   notifier_id: string;
@@ -642,6 +710,7 @@ export interface NotificationReminderRuleRecord {
 }
 
 export interface NotificationReminderRuleInput {
+	message_template?: string;
   id?: string;
   name: string;
   notifier_id: string;

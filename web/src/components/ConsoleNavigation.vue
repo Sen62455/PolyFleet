@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import {
   Activity,
   BarChart3,
   BellRing,
+  Cable,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -14,7 +16,7 @@ import {
 import { NTooltip } from "naive-ui";
 import BrandMark from "./BrandMark.vue";
 
-type NavigationView = "overview" | "nodes" | "users" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
+type NavigationView = "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
 
 const props = withDefaults(defineProps<{
   activeView: NavigationView;
@@ -34,11 +36,15 @@ const navigation = [
   { key: "overview" as const, label: "总览", icon: LayoutDashboard, group: "监控" },
   { key: "nodes" as const, label: "节点", icon: Server, group: "监控" },
   { key: "users" as const, label: "用户", icon: UsersRound, group: "管理" },
+  { key: "exits" as const, label: "出口代理", icon: Cable, group: "管理" },
   { key: "subscriptions" as const, label: "订阅运营", icon: KeyRound, group: "运营" },
   { key: "reports" as const, label: "流量报表", icon: BarChart3, group: "运营" },
   { key: "notifications" as const, label: "告警通知", icon: BellRing, group: "运营" },
   { key: "operations" as const, label: "操作记录", icon: ClipboardList, group: "审计" },
 ];
+
+const segmentCount = computed(() => Math.min(props.total, 12));
+const onlineSegments = computed(() => props.total ? Math.round(props.online / props.total * segmentCount.value) : 0);
 
 function active(key: string) {
   return key === "nodes"
@@ -75,7 +81,6 @@ function active(key: string) {
             >
               <component :is="item.icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
               <span v-if="!collapsed || mobile">{{ item.label }}</span>
-              <chevron-right v-if="(!collapsed || mobile) && active(item.key)" :size="14" aria-hidden="true" />
             </button>
           </template>
           {{ item.label }}
@@ -91,8 +96,7 @@ function active(key: string) {
         <strong>{{ online }} / {{ total }}</strong>
         <span :class="{ 'is-warning': issues > 0 }">{{ issues ? `${issues} 项需关注` : total ? "全部在线" : "等待节点" }}</span>
       </div>
-      <small class="console-nav__health-state" :class="{ 'is-warning': issues > 0 }"><i />{{ issues ? "需要检查" : total ? "运行正常" : "尚未接入" }}</small>
-      <i><span :style="{ width: `${total ? Math.round((online / total) * 100) : 0}%` }" /></i>
+      <div class="console-nav__segments" aria-hidden="true"><i v-for="n in segmentCount" :key="n" :class="n <= onlineSegments ? 'is-on' : 'is-off'" /></div>
     </section>
 
     <n-tooltip v-else trigger="hover" placement="right">

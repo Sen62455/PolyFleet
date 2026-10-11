@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { Plus, RefreshCw, Search, UsersRound } from "@lucide/vue";
+import { Ban, Gauge, Wifi, Plus, RefreshCw, Search, UsersRound } from "@lucide/vue";
 import { NAlert, NButton, NIcon, NInput, NSpin, NTooltip, useDialog, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import type {
@@ -18,6 +18,7 @@ import SubscriptionTokenDialog from "./SubscriptionTokenDialog.vue";
 import SubscriptionTokenFormModal from "./SubscriptionTokenFormModal.vue";
 import UserDetailDrawer from "./UserDetailDrawer.vue";
 import UserFormModal from "./UserFormModal.vue";
+import StatCard from "../../components/StatCard.vue";
 import UserTable from "./UserTable.vue";
 
 const props = defineProps<{ nodes: NodeRecord[] }>();
@@ -579,24 +580,20 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <section class="fleet-summary users-summary" aria-label="用户摘要">
-      <div class="fleet-summary__item">
-        <span>全部用户</span>
-        <strong>{{ totalUsers }}</strong>
-      </div>
-      <div class="fleet-summary__item fleet-summary__item--healthy">
-        <span>活跃连接</span>
-        <strong>{{ onlineConnections }}</strong>
-      </div>
-      <div class="fleet-summary__item fleet-summary__item--warning">
-        <span>额度用尽</span>
-        <strong>{{ limitedCount }}</strong>
-      </div>
-      <div class="fleet-summary__item fleet-summary__item--danger">
-        <span>不可用账户</span>
-        <strong>{{ unavailableCount }}</strong>
-      </div>
-    </section>
+    <section class="stat-grid" aria-label="用户摘要">
+  <stat-card label="全部用户" :muted="totalUsers === 0">
+    <template #icon><users-round :size="18" /></template>{{ totalUsers }}
+  </stat-card>
+  <stat-card label="活跃连接" tone="signal" :muted="onlineConnections === 0">
+    <template #icon><wifi :size="18" /></template>{{ onlineConnections }}
+  </stat-card>
+  <stat-card label="额度用尽" tone="pressure" :muted="limitedCount === 0">
+    <template #icon><gauge :size="18" /></template>{{ limitedCount }}
+  </stat-card>
+  <stat-card label="不可用账户" tone="critical" :muted="unavailableCount === 0">
+    <template #icon><ban :size="18" /></template>{{ unavailableCount }}
+  </stat-card>
+</section>
 
     <n-alert v-if="loadError" type="error" :show-icon="false" class="workspace-alert">
       <div class="alert-row">
@@ -605,32 +602,31 @@ onBeforeUnmount(() => {
       </div>
     </n-alert>
 
-    <section v-if="!loading && users.length" class="user-ledger-toolbar" aria-label="筛选用户">
-      <n-input
-        v-model:value="searchQuery"
-        clearable
-        class="user-ledger-search"
-        aria-label="搜索用户"
-        placeholder="搜索姓名、用户名或备注"
-      >
-        <template #prefix><n-icon><search /></n-icon></template>
-      </n-input>
-      <div class="user-filter-segment" role="group" aria-label="用户状态">
-        <button
-          v-for="filter in userFilters"
-          :key="filter.value"
-          type="button"
-          :class="{ active: userFilter === filter.value }"
-          :aria-pressed="userFilter === filter.value"
-          @click="userFilter = filter.value"
-        >
-          {{ filter.label }}
-        </button>
-      </div>
-      <span class="user-filter-result">本页 {{ filteredUsers.length }} / {{ users.length }} · 共 {{ totalUsers }}</span>
-    </section>
-
       <section class="node-surface users-surface" aria-label="用户列表">
+        <header v-if="!loading && users.length" class="user-ledger-toolbar" aria-label="筛选用户">
+          <n-input
+            v-model:value="searchQuery"
+            clearable
+            class="user-ledger-search"
+            aria-label="搜索用户"
+            placeholder="搜索姓名、用户名或备注"
+          >
+            <template #prefix><n-icon><search /></n-icon></template>
+          </n-input>
+          <div class="user-filter-segment" role="group" aria-label="用户状态">
+            <button
+              v-for="filter in userFilters"
+              :key="filter.value"
+              type="button"
+              :class="{ active: userFilter === filter.value }"
+              :aria-pressed="userFilter === filter.value"
+              @click="userFilter = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+          <span class="user-filter-result">本页 {{ filteredUsers.length }} / {{ users.length }} · 共 {{ totalUsers }}</span>
+        </header>
         <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
         <div v-else-if="users.length === 0" class="surface-state surface-state--empty">
           <users-round :size="28" :stroke-width="1.7" aria-hidden="true" />
@@ -722,3 +718,40 @@ onBeforeUnmount(() => {
     @update:show="setIssuedSubscriptionOpen"
   />
 </template>
+
+<style scoped>
+.users-surface {
+  overflow: hidden;
+  border-radius: var(--hf-radius);
+}
+
+.user-ledger-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hf-line);
+  background: transparent;
+}
+
+.user-ledger-search {
+  width: min(280px, 100%);
+}
+
+.user-filter-result {
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  .user-ledger-search {
+    width: 100%;
+  }
+
+  .user-filter-result {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+</style>

@@ -90,6 +90,8 @@ type Node struct {
 	OnlineUnknownUsers           int
 	OnlineSampledAt              *time.Time
 	OnlineLastReportAt           *time.Time
+	ExitProxyID                  string
+	ExitProxy                    *ExitProxy
 	CreatedAt                    time.Time
 	UpdatedAt                    time.Time
 }
@@ -110,6 +112,7 @@ type NewNode struct {
 	VLESSReality       *VLESSRealitySettings
 	TrafficLimitBytes  int64
 	TrafficResetDay    int
+	ExitProxyID        string
 	Now                time.Time
 }
 
@@ -128,6 +131,7 @@ type UpdateNode struct {
 	VLESSReality       *VLESSRealitySettings
 	TrafficLimitBytes  int64
 	TrafficResetDay    int
+	ExitProxyID        string
 	Now                time.Time
 }
 
@@ -152,7 +156,8 @@ const nodeColumns = `
 	traffic_cycle_started_at, traffic_cycle_upload_bytes, traffic_cycle_download_bytes,
 	traffic_calibration_bytes, traffic_calibration_proxy_bytes, traffic_calibrated_at,
 	online_users, online_connections, online_unknown_users,
-	online_sampled_at, online_last_report_at, created_at, updated_at
+	online_sampled_at, online_last_report_at, created_at, updated_at,
+	COALESCE(exit_proxy_id, '')
 `
 
 type rowScanner interface {
@@ -193,7 +198,7 @@ func scanNode(row rowScanner) (Node, error) {
 		&node.TrafficCycleUploadBytes, &node.TrafficCycleDownloadBytes,
 		&trafficCalibration, &trafficCalibrationProxy, &trafficCalibrated,
 		&node.OnlineUsers, &node.OnlineConnections, &node.OnlineUnknownUsers,
-		&onlineSampled, &onlineLastReport, &created, &updated,
+		&onlineSampled, &onlineLastReport, &created, &updated, &node.ExitProxyID,
 	)
 	if err != nil {
 		return Node{}, err
@@ -244,13 +249,14 @@ func (s *Store) CreateNode(ctx context.Context, input NewNode) (Node, error) {
 			id, name, provider, region, adapter_type, public_host, public_port,
 			sni, tls_insecure, tls_cert_fingerprint, tls_public_key_sha256,
 			enabled, status, traffic_limit_bytes, traffic_reset_day, traffic_cycle_started_at,
-			desired_version, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+			exit_proxy_id, desired_version, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
 	`, input.ID, input.Name, input.Provider, input.Region, input.AdapterType,
 		input.PublicHost, input.PublicPort, input.SNI, boolInt(input.TLSInsecure),
 		input.TLSCertFingerprint, input.TLSPublicKeySHA256,
 		boolInt(input.Enabled), status, input.TrafficLimitBytes, input.TrafficResetDay,
-		cycleStart.UnixMilli(), input.Now.UnixMilli(), input.Now.UnixMilli())
+		cycleStart.UnixMilli(), nullableString(input.ExitProxyID),
+		input.Now.UnixMilli(), input.Now.UnixMilli())
 	if err != nil {
 		_ = tx.Rollback()
 		return Node{}, fmt.Errorf("insert node: %w", err)
@@ -307,6 +313,9 @@ func (s *Store) ListNodes(ctx context.Context) ([]Node, error) {
 			return nil, err
 		}
 	}
+	if err := s.attachNodeExitProxies(ctx, nodes); err != nil {
+		return nil, err
+	}
 	return nodes, nil
 }
 
@@ -326,7 +335,11 @@ func (s *Store) GetNode(ctx context.Context, id string) (Node, error) {
 			return Node{}, err
 		}
 	}
-	return node, nil
+	nodes := []Node{node}
+	if err := s.attachNodeExitProxies(ctx, nodes); err != nil {
+		return Node{}, err
+	}
+	return nodes[0], nil
 }
 
 func (s *Store) UpdateNode(ctx context.Context, id string, input UpdateNode) (Node, error) {
@@ -392,14 +405,15 @@ func (s *Store) UpdateNode(ctx context.Context, id string, input UpdateNode) (No
 			tls_cert_fingerprint = ?, tls_public_key_sha256 = ?, enabled = ?,
 			status = ?, status_reason = '', desired_version = ?, updated_at = ?
 			, traffic_limit_bytes = ?, traffic_reset_day = ?, traffic_cycle_started_at = ?,
-			traffic_cycle_upload_bytes = ?, traffic_cycle_download_bytes = ?
+			traffic_cycle_upload_bytes = ?, traffic_cycle_download_bytes = ?,
+			exit_proxy_id = ?
 		WHERE id = ? AND archived_at IS NULL
 	`, input.Name, input.Provider, input.Region, input.AdapterType,
 		input.PublicHost, input.PublicPort, input.SNI, boolInt(input.TLSInsecure),
 		input.TLSCertFingerprint, input.TLSPublicKeySHA256,
 		boolInt(input.Enabled), status, version, input.Now.UnixMilli(),
 		input.TrafficLimitBytes, input.TrafficResetDay, cycleStart.UnixMilli(),
-		cycleUpload, cycleDownload, id)
+		cycleUpload, cycleDownload, nullableString(input.ExitProxyID), id)
 	if err != nil {
 		_ = tx.Rollback()
 		return Node{}, fmt.Errorf("update node: %w", err)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   Bell,
 	ChevronDown,
@@ -34,6 +34,7 @@ import { issueCount } from "../../lib/format";
 import type {
   AlertRecord,
   BulkNodeAction,
+  ExitProxyRecord,
   NodeAssetInput,
   NodeAssetRecord,
   NodeInput,
@@ -62,6 +63,9 @@ const TrafficReportsDashboard = defineAsyncComponent(
 const NotificationDashboard = defineAsyncComponent(
   () => import("../notifications/NotificationDashboard.vue"),
 );
+const ExitProxyDashboard = defineAsyncComponent(
+  () => import("../exits/ExitProxyDashboard.vue"),
+);
 
 const props = defineProps<{ session: Session }>();
 const emit = defineEmits<{ logout: []; "session-expired": [] }>();
@@ -69,6 +73,7 @@ const emit = defineEmits<{ logout: []; "session-expired": [] }>();
 const message = useMessage();
 const dialog = useDialog();
 const nodes = ref<NodeRecord[]>([]);
+const exitProxies = ref<ExitProxyRecord[]>([]);
 const nodeTrends = ref<Record<string, NodeMetricSeries>>({});
 const nodeAssets = ref<NodeAssetRecord[]>([]);
 const overviewTrafficReport = ref<TrafficReport | null>(null);
@@ -83,8 +88,13 @@ const detailNodeID = ref<string | null>(null);
 const enrollmentNode = ref<NodeRecord | null>(null);
 const assetNode = ref<NodeRecord | null>(null);
 const assetSaving = ref(false);
-type DashboardView = "overview" | "nodes" | "users" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
+type DashboardView = "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
 const activeView = ref<DashboardView>("overview");
+const consoleContent = ref<InstanceType<typeof NLayoutContent> | null>(null);
+watch([activeView, detailNodeID], async () => {
+  await nextTick();
+  consoleContent.value?.scrollTo({ top: 0, left: 0 });
+});
 const detailReturnView = ref<"overview" | "nodes" | "users" | "operations">("overview");
 const operationsNodeFilter = ref("");
 const alerts = ref<AlertRecord[]>([]);
@@ -114,12 +124,14 @@ const pageTitle = computed(() => {
 	if (activeView.value === "overview") return "总览";
 	if (activeView.value === "nodes") return "节点";
 	if (activeView.value === "users") return "用户";
+	if (activeView.value === "exits") return "出口代理";
 	if (activeView.value === "subscriptions") return "订阅运营";
 	if (activeView.value === "reports") return "流量报表";
 	if (activeView.value === "notifications") return "告警通知";
 	if (activeView.value === "operations") return "操作记录";
-	return detailNode.value?.name || "节点详情";
+	return "节点详情";
 });
+const pageGroup = computed(() => ({ overview: "监控", nodes: "监控", "node-detail": "监控", users: "管理", exits: "管理", subscriptions: "运营", reports: "运营", notifications: "运营", operations: "审计" })[activeView.value]);
 const headerStatus = computed(() => {
   return issues.value ? `${issues.value} 台节点需关注` : "系统正常";
 });
@@ -156,9 +168,14 @@ async function loadNodes(silent = false) {
   refreshing.value = true;
   loadError.value = "";
   try {
-    const [nextNodes, assets] = await Promise.all([api.listNodes(), api.listNodeAssets()]);
+    const [nextNodes, assets, nextExits] = await Promise.all([
+      api.listNodes(),
+      api.listNodeAssets(),
+      api.listExitProxies(),
+    ]);
     nodes.value = nextNodes;
     nodeAssets.value = assets;
+    exitProxies.value = nextExits;
     selectedNodeIDs.value = selectedNodeIDs.value.filter((id) => nextNodes.some((node) => node.id === id));
     if (!silent || Object.keys(nodeTrends.value).length === 0) {
       void loadNodeTrends(nodes.value);
@@ -261,7 +278,7 @@ function openAlerts() {
 	void loadAlerts();
 }
 
-function navigate(view: "overview" | "nodes" | "users" | "subscriptions" | "reports" | "notifications" | "operations") {
+function navigate(view: "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations") {
 	if (mobileNavigationOpen.value) {
 		blurActiveElement();
 	}
@@ -450,7 +467,7 @@ onBeforeUnmount(() => {
     <n-layout has-sider class="console-shell">
       <n-layout-sider
         class="console-sidebar"
-        :width="244"
+        :width="232"
         :collapsed-width="72"
         :collapsed="sidebarCollapsed"
         :show-trigger="false"
@@ -479,9 +496,7 @@ onBeforeUnmount(() => {
             >
               <template #icon><n-icon><menu-icon /></n-icon></template>
             </n-button>
-            <div>
-              <h1>{{ pageTitle }}</h1>
-            </div>
+            <div class="console-header__title"><span>{{ pageGroup }}</span><b>/</b><h1>{{ pageTitle }}</h1></div>
           </div>
 
           <div class="console-header__actions">
@@ -528,7 +543,7 @@ onBeforeUnmount(() => {
           </div>
         </n-layout-header>
 
-        <n-layout-content class="console-content" content-style="min-height: 100%;">
+        <n-layout-content ref="consoleContent" class="console-content" content-style="min-height: 100%;">
           <fleet-overview
             v-if="activeView === 'overview'"
             :nodes="nodes"
@@ -617,6 +632,12 @@ onBeforeUnmount(() => {
             @session-expired="emit('session-expired')"
           />
 
+          <exit-proxy-dashboard
+            v-else-if="activeView === 'exits'"
+            @nodes-changed="loadNodes(true)"
+            @session-expired="emit('session-expired')"
+          />
+
           <subscription-dashboard
             v-else-if="activeView === 'subscriptions'"
             @session-expired="emit('session-expired')"
@@ -678,7 +699,9 @@ onBeforeUnmount(() => {
       v-model:show="formOpen"
       :node="editingNode"
       :saving="saving"
+      :exit-proxies="exitProxies"
       @submit="saveNode"
+      @manage-exits="formOpen = false; navigate('exits')"
     />
     <enrollment-dialog
       :show="enrollmentNode !== null"

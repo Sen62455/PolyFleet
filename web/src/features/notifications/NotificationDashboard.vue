@@ -19,6 +19,7 @@ import {
   useMessage,
 } from "naive-ui";
 import { api, APIError } from "../../api";
+import StatCard from "../../components/StatCard.vue";
 import { relativeTime } from "../../lib/format";
 import type { NodeRecord, NotificationEvent, NotificationKind, NotificationNotifierRecord, NotificationReminderKind, NotificationReminderRuleRecord, NotificationSettings } from "../../types";
 
@@ -50,6 +51,20 @@ const reminderInterval = ref(360);
 const reminderLeadDays = ref(30);
 const reminderThreshold = ref(80);
 const reminderNodeIDs = ref<string[]>([]);
+const reminderMessageTemplate = ref("");
+const telegramUpdatesTemplate = "https://api.telegram.org/bot<BotToken>/getUpdates";
+const reminderMessageError = computed(() => {
+  const remaining = reminderMessageTemplate.value.replaceAll("{{details}}", "").replaceAll("{{time}}", "");
+  return remaining.includes("{{") || remaining.includes("}}") ? "仅支持 {{details}} 和 {{time}} 占位符。" : "";
+});
+const reminderMessageHeader = computed(() => `规则名称：${reminderName.value.trim().replace(/\s+/g, " ") || "（待填写）"}\n提醒类型：${reminderKindLabel(reminderKind.value)}\n提醒频率：${intervalLabel(reminderInterval.value)}`);
+const reminderMessagePreview = computed(() => {
+  const details = `［发送时自动生成：${reminderKindLabel(reminderKind.value)}的实时数据］`;
+  const body = reminderMessageTemplate.value.trim()
+    ? reminderMessageTemplate.value.trim().replaceAll("{{details}}", details).replaceAll("{{time}}", "［发送时间，UTC］")
+    : details;
+  return `${reminderMessageHeader.value}\n\n${body}`;
+});
 const telegramChatIDPattern = /^(?:-?\d+|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
 
 const delivered = computed(() => settings.value.deliveries.filter((item) => item.status === "delivered").length);
@@ -102,6 +117,20 @@ function handleError(error: unknown, fallback: string) {
   message.error(error instanceof APIError ? error.message : fallback);
 }
 
+async function copyTelegramUpdatesURL() {
+  const token = botToken.value.trim();
+  if (token && !/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
+    message.warning("请先填写完整的 Bot Token，或清空后复制接口模板。");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(token ? `https://api.telegram.org/bot${token}/getUpdates` : telegramUpdatesTemplate);
+    message.success(token ? "接口地址已复制，包含 Bot Token，请勿转发" : "接口模板已复制，请替换 <BotToken>");
+  } catch {
+    message.error("复制失败，请手动复制下方接口模板。");
+  }
+}
+
 async function load() {
   if (refreshing.value) return;
   refreshing.value = true;
@@ -128,6 +157,7 @@ function openReminderCreate() {
   reminderLeadDays.value = 30;
   reminderThreshold.value = 80;
   reminderNodeIDs.value = [];
+  reminderMessageTemplate.value = "";
   reminderModalOpen.value = true;
 }
 
@@ -141,10 +171,15 @@ function openReminderEdit(rule: NotificationReminderRuleRecord) {
   reminderLeadDays.value = rule.lead_days;
   reminderThreshold.value = rule.threshold_percent;
   reminderNodeIDs.value = [...rule.node_ids];
+  reminderMessageTemplate.value = rule.message_template ?? "";
   reminderModalOpen.value = true;
 }
 
 async function saveReminder() {
+  if (reminderMessageError.value) {
+    message.warning(reminderMessageError.value);
+    return;
+  }
   if (!reminderName.value.trim() || !reminderNotifierID.value) {
     message.warning("请填写规则名称并选择通知通道");
     return;
@@ -161,6 +196,7 @@ async function saveReminder() {
       lead_days: reminderLeadDays.value,
       threshold_percent: reminderThreshold.value,
       node_ids: reminderNodeIDs.value,
+      message_template: reminderMessageTemplate.value.trim(),
     });
     reminderModalOpen.value = false;
     await load();
@@ -192,6 +228,7 @@ async function setReminderEnabled(rule: NotificationReminderRuleRecord, enabled:
       id: rule.id, name: rule.name, notifier_id: rule.notifier_id, kind: rule.kind,
       enabled, interval_minutes: rule.interval_minutes, lead_days: rule.lead_days,
       threshold_percent: rule.threshold_percent, node_ids: rule.node_ids,
+      message_template: rule.message_template ?? "",
     });
     await load();
   } catch (error) {
@@ -366,15 +403,31 @@ onMounted(() => load());
 <template>
   <main class="workspace operations-workspace notification-workspace">
     <div class="page-heading page-heading--console">
-      <div><span class="page-eyebrow">ALERT EGRESS</span><h2>告警通知</h2><p>告警创建与恢复会进入持久化队列，失败按退避策略重试</p></div>
+      <div><h2>告警通知</h2><p>告警创建与恢复会进入持久化队列，失败按退避策略重试</p></div>
       <div class="page-heading__actions"><n-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新通知" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</n-tooltip><n-button type="primary" @click="openCreate"><template #icon><n-icon><plus /></n-icon></template>添加通道</n-button></div>
     </div>
 
-    <section class="ops-register" aria-label="通知摘要">
-      <div><span><webhook :size="15" />通知通道</span><strong>{{ settings.notifiers.length }}</strong><small>{{ settings.notifiers.filter((item) => item.enabled).length }} 个启用 · {{ activeReminderCount }} 条自动规则</small></div>
-      <div><span><check-circle2 :size="15" />已送达</span><strong>{{ delivered }}</strong><small>最近 30 条投递记录</small></div>
-      <div><span><send :size="15" />待投递 / 重试</span><strong :class="{ 'is-warning': pending }">{{ pending }}</strong><small>服务端自动处理</small></div>
-      <div><span><bell-ring :size="15" />最终失败</span><strong :class="{ 'is-danger': failed }">{{ failed }}</strong><small>超过最大重试次数</small></div>
+    <section class="stat-grid" aria-label="通知摘要">
+      <stat-card label="通知通道">
+        <template #icon><webhook :size="18" /></template>
+        {{ settings.notifiers.length }}
+        <template #hint>{{ settings.notifiers.filter((item) => item.enabled).length }} 个启用 · {{ activeReminderCount }} 条自动规则</template>
+      </stat-card>
+      <stat-card label="已送达" tone="signal">
+        <template #icon><check-circle2 :size="18" /></template>
+        {{ delivered }}
+        <template #hint>最近 30 条投递记录</template>
+      </stat-card>
+      <stat-card label="待投递 / 重试" :tone="pending ? 'pressure' : 'neutral'" :muted="!pending">
+        <template #icon><send :size="18" /></template>
+        {{ pending }}
+        <template #hint>服务端自动处理</template>
+      </stat-card>
+      <stat-card label="最终失败" :tone="failed ? 'critical' : 'neutral'" :muted="!failed">
+        <template #icon><bell-ring :size="18" /></template>
+        {{ failed }}
+        <template #hint>超过最大重试次数</template>
+      </stat-card>
     </section>
 
     <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
@@ -386,7 +439,7 @@ onMounted(() => load());
           <article v-for="item in settings.notifiers" :key="item.id">
             <div class="notifier-list__icon"><bell-ring :size="18" /></div>
             <div class="notifier-list__identity"><strong>{{ item.name }}</strong><small>{{ kindLabel(item.kind) }} · {{ item.target_hint }} · {{ item.events.map((event) => event === 'created' ? '创建' : '恢复').join(' / ') }}</small></div>
-            <span class="ops-status" :class="item.enabled ? 'is-active' : 'is-disabled'">{{ item.enabled ? '启用' : '停用' }}</span>
+            <span class="pill" :class="item.enabled ? 'pill--signal' : 'pill--neutral'">{{ item.enabled ? '启用' : '停用' }}</span>
             <div class="notifier-list__actions"><n-button size="small" secondary @click="openEdit(item)">编辑</n-button><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary :loading="working === `test:${item.id}`" aria-label="测试通知" @click="test(item)"><template #icon><n-icon><flask-conical /></n-icon></template></n-button></template>发送测试</n-tooltip><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary type="error" aria-label="删除通道" @click="remove(item)"><template #icon><n-icon><trash2 /></n-icon></template></n-button></template>删除</n-tooltip></div>
           </article>
         </div>
@@ -424,7 +477,7 @@ onMounted(() => load());
       <section class="ops-surface delivery-surface">
         <header><span>DELIVERY LOG</span><h3>最近投递</h3></header>
         <div v-if="settings.deliveries.length === 0" class="surface-state surface-state--empty"><send :size="25" /><strong>暂无投递记录</strong></div>
-        <div v-else class="ops-table-wrap"><table class="ops-table"><thead><tr><th>通道</th><th>事件</th><th>状态</th><th>尝试</th><th>HTTP</th><th>时间</th><th>错误</th></tr></thead><tbody><tr v-for="item in settings.deliveries" :key="item.id"><td><strong>{{ item.notifier_name }}</strong><small>{{ kindLabel(item.notifier_kind) }}</small></td><td>{{ item.event_type === 'created' ? '告警创建' : '告警恢复' }}</td><td><span class="ops-status" :class="`is-${item.status}`">{{ ({ queued: '排队', retry: '重试', delivered: '已送达', failed: '失败' } as const)[item.status] }}</span></td><td>{{ item.attempt_count }}</td><td>{{ item.response_code || '—' }}</td><td>{{ relativeTime(item.delivered_at || item.created_at) }}</td><td class="delivery-surface__error">{{ item.last_error || '—' }}</td></tr></tbody></table></div>
+        <div v-else class="ops-table-wrap"><table class="ops-table"><thead><tr><th>通道</th><th>事件</th><th>状态</th><th>尝试</th><th>HTTP</th><th>时间</th><th>错误</th></tr></thead><tbody><tr v-for="item in settings.deliveries" :key="item.id"><td><strong>{{ item.notifier_name }}</strong><small>{{ kindLabel(item.notifier_kind) }}</small></td><td>{{ item.event_type === 'created' ? '告警创建' : '告警恢复' }}</td><td><span class="pill" :class="`pill--${({ queued: 'pressure', retry: 'pressure', delivered: 'signal', failed: 'critical' } as const)[item.status]}`">{{ ({ queued: '排队', retry: '重试', delivered: '已送达', failed: '失败' } as const)[item.status] }}</span></td><td>{{ item.attempt_count }}</td><td>{{ item.response_code || '—' }}</td><td>{{ relativeTime(item.delivered_at || item.created_at) }}</td><td class="delivery-surface__error">{{ item.last_error || '—' }}</td></tr></tbody></table></div>
       </section>
     </template>
 
@@ -443,6 +496,21 @@ onMounted(() => load());
         <n-form-item v-if="reminderKind === 'asset_expiry'" label="提前提醒天数"><n-input-number v-model:value="reminderLeadDays" :min="0" :max="365" /></n-form-item>
         <n-form-item v-if="reminderKind === 'traffic_usage'" label="流量使用阈值（%）"><n-input-number v-model:value="reminderThreshold" :min="1" :max="100" /></n-form-item>
         <n-form-item label="作用节点"><n-select v-model:value="reminderNodeIDs" multiple clearable :options="nodeOptions" placeholder="留空表示全部节点" /></n-form-item>
+        <section class="reminder-message-editor" aria-label="通知内容">
+          <strong>通知内容</strong>
+          <p>规则名称、提醒类型和提醒频率由上方规则设置自动生成，在消息正文中不可编辑或替换。</p>
+          <pre class="reminder-message-header" data-testid="reminder-fixed-fields">{{ reminderMessageHeader }}</pre>
+          <n-form-item label="自定义正文" :validation-status="reminderMessageError ? 'error' : undefined" :feedback="reminderMessageError || undefined">
+            <n-input v-model:value="reminderMessageTemplate" data-testid="reminder-message-template" type="textarea" maxlength="2000" show-count :autosize="{ minRows: 4, maxRows: 10 }" placeholder="留空使用系统正文；也可写入自己的提醒内容，并插入实时数据。" />
+          </n-form-item>
+          <div class="reminder-message-tools">
+            <n-button size="tiny" secondary @click="reminderMessageTemplate += '{{details}}'">插入实时数据</n-button>
+            <n-button size="tiny" secondary @click="reminderMessageTemplate += '{{time}}'">插入发送时间</n-button>
+            <n-button size="tiny" quaternary @click="reminderMessageTemplate = ''">恢复系统正文</n-button>
+          </div>
+          <p><code v-pre>{{details}}</code> 为当前统计或命中列表，<code v-pre>{{time}}</code> 为发送时间。自定义正文不会改变规则的触发条件。</p>
+          <details open class="reminder-message-preview"><summary>通知预览（数据将在发送时填入）</summary><pre data-testid="reminder-message-preview">{{ reminderMessagePreview }}</pre></details>
+        </section>
         <div class="reminder-modal__note"><strong>发送策略</strong><span>运行概览始终发送；告警、到期和流量规则仅在有命中项时发送。失败会在 5 分钟后重试，成功后按所选频率继续。</span></div>
         <n-form-item label="启用"><n-switch v-model:value="reminderEnabled" /></n-form-item>
         <div class="modal-actions"><n-button :disabled="saving" @click="reminderModalOpen = false">取消</n-button><n-button type="primary" attr-type="submit" :loading="saving">保存</n-button></div>
@@ -471,6 +539,14 @@ onMounted(() => load());
             <strong>填写接收通知的目标，不是机器人用户名</strong>
             <span>私聊：先向机器人发送 /start，再填写数字 chat.id</span>
             <span>群组：添加机器人后填写负数 chat.id；公开频道可填写 @channel_username，并授予机器人发消息权限</span>
+            <strong>获取 chat.id：按下面 3 步操作</strong>
+            <span>1. 在接收通知的私聊或群组里向机器人发送 /start。频道请先将机器人设为管理员，再发布一条消息。</span>
+            <span>2. 复制接口地址到浏览器打开；将 &lt;BotToken&gt; 替换为 BotFather 提供的密钥。上方填写了 Token 时，复制按钮会自动填入。</span>
+            <code class="telegram-api-template" data-testid="telegram-updates-api">{{ telegramUpdatesTemplate }}</code>
+            <div><n-button size="tiny" secondary @click="copyTelegramUpdatesURL">复制 Chat ID 接口</n-button> <a href="https://core.telegram.org/bots/api#getupdates" target="_blank" rel="noopener noreferrer">Telegram 官方说明</a></div>
+            <span>3. 找到 result 中的 message.chat.id，复制完整数字（含负号）到上方 Chat ID。频道对应 channel_post.chat.id；不要复制 from.id。</span>
+            <span>若 result 为空，请先暂停下方的「Bot 查询」、重新发消息后再打开接口，取到 ID 后可重新开启。409 表示已有 Webhook 或其他程序在获取更新，需要先处理该冲突。</span>
+            <span v-if="editingID">已保存的 Token 不会回显；未重新填写 Token 时，复制的是接口模板。</span>
           </div>
         </template>
         <n-form-item v-else :label="kind === 'slack' ? 'Slack Incoming Webhook URL' : 'Webhook URL'"><n-input v-model:value="url" type="password" show-password-on="click" :placeholder="editingID ? '留空保持现有地址' : 'https://...'" /></n-form-item>
@@ -483,8 +559,15 @@ onMounted(() => load());
 </template>
 
 <style scoped>
-.notification-workspace { display: grid; gap: 20px; }.notifier-surface,.delivery-surface { border: 1px solid var(--hf-line-strong); background: var(--hf-surface); }.notifier-surface > header,.delivery-surface > header { min-height: 62px; padding: 13px 18px; border-bottom: 1px solid var(--hf-line); }.notifier-surface > header span,.delivery-surface > header span { color: var(--hf-muted); font-family: var(--hf-data); font-size: 9px; }.notifier-surface h3,.delivery-surface h3 { margin: 4px 0 0; color: var(--hf-ink); font-size: 14px; }.notifier-list article { display: grid; min-height: 76px; grid-template-columns: 38px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--hf-line); }.notifier-list article:last-child { border-bottom: 0; }.notifier-list__icon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--hf-line-strong); color: var(--hf-accent); }.notifier-list__identity strong,.notifier-list__identity small { display: block; }.notifier-list__identity strong { color: var(--hf-ink); font-size: 13px; }.notifier-list__identity small { margin-top: 5px; color: var(--hf-muted); font-size: 10px; }.notifier-list__actions { display: flex; align-items: center; gap: 3px; }.delivery-surface__error { max-width: 280px; overflow: hidden; color: var(--hf-muted); text-overflow: ellipsis; white-space: nowrap; }.notifier-modal__grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }.notifier-field-help { display: grid; gap: 4px; margin: -8px 0 20px; padding: 11px 13px; border: 1px solid var(--hf-line); background: var(--hf-surface-soft); color: var(--hf-muted); font-size: 11px; line-height: 1.55; }.notifier-field-help strong { color: var(--hf-ink); font-size: 11px; }.notifier-field-help span { display: block; }@media (max-width: 720px) { .notifier-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.notifier-list__actions { grid-column: 2 / -1; }.notifier-modal__grid { grid-template-columns: 1fr; gap: 0; }.notifier-field-help { margin-top: -4px; } }
-.reminder-surface,.bot-surface { border: 1px solid var(--hf-line-strong); background: var(--hf-surface); }.notification-surface-heading { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 18px; border-bottom: 1px solid var(--hf-line); }.notification-surface-heading span { color: var(--hf-muted); font-family: var(--hf-data); font-size: 9px; }.notification-surface-heading h3 { margin: 4px 0 0; color: var(--hf-ink); font-size: 14px; }.notification-surface-heading p { margin: 4px 0 0; color: var(--hf-muted); font-size: 10px; }.reminder-list article { display: grid; min-height: 84px; grid-template-columns: 38px minmax(220px, 1fr) minmax(120px, auto) auto auto; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--hf-line); }.reminder-list article:last-child,.bot-list article:last-child { border-bottom: 0; }.reminder-list__icon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--hf-line-strong); color: var(--hf-accent); }.reminder-list__identity strong,.reminder-list__identity small,.reminder-list__identity em,.reminder-list__schedule span,.reminder-list__schedule small,.bot-list article strong,.bot-list article small,.bot-list article em { display: block; }.reminder-list__identity strong,.bot-list article strong { color: var(--hf-ink); font-size: 13px; }.reminder-list__identity small,.bot-list article small { margin-top: 4px; color: var(--hf-muted); font-size: 10px; }.reminder-list__identity em,.bot-list article em { margin-top: 5px; color: var(--hf-muted); font-size: 10px; font-style: normal; }.reminder-list__identity em.is-error,.bot-list article em.is-error { color: var(--hf-danger); }.reminder-list__schedule { text-align: right; }.reminder-list__schedule span { color: var(--hf-ink); font-size: 11px; }.reminder-list__schedule small { margin-top: 4px; color: var(--hf-muted); font-size: 9px; }.bot-list article { display: grid; min-height: 76px; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--hf-line); }.reminder-modal__note { display: grid; gap: 4px; margin: -4px 0 18px; padding: 11px 13px; border: 1px solid var(--hf-line); background: var(--hf-surface-soft); color: var(--hf-muted); font-size: 11px; line-height: 1.55; }.reminder-modal__note strong { color: var(--hf-ink); }@media (max-width: 820px) { .reminder-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.reminder-list__schedule { grid-column: 2; text-align: left; }.reminder-list__actions { grid-column: 2 / -1; }.notification-surface-heading { align-items: flex-start; } }@media (max-width: 520px) { .notification-surface-heading { flex-direction: column; }.notification-surface-heading .n-button { width: 100%; }.reminder-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.reminder-list__identity { min-width: 0; }.reminder-list__identity small { overflow-wrap: anywhere; } }
+.reminder-message-editor { display: grid; gap: 10px; margin: 0 0 20px; padding: 14px; border: 1px solid var(--hf-line); border-radius: 10px; }
+.reminder-message-editor > p { margin: 0; color: var(--hf-muted); font-size: 12px; line-height: 1.65; }
+.reminder-message-editor .n-form-item { margin-bottom: 0; }
+.reminder-message-header, .reminder-message-preview pre { margin: 0; padding: 12px; background: var(--hf-surface-soft); color: var(--hf-ink); font: 12px/1.7 var(--hf-data); white-space: pre-wrap; overflow-wrap: anywhere; }
+.reminder-message-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.reminder-message-preview summary { cursor: pointer; margin-bottom: 8px; color: var(--hf-muted); font-size: 12px; }
+.telegram-api-template { display: block; padding: 8px; overflow-wrap: anywhere; color: var(--hf-ink); }
+.notification-workspace { display: grid; gap: 20px; }.notifier-surface,.delivery-surface { overflow: hidden; border: 1px solid var(--hf-line); border-radius: var(--hf-radius); background: var(--hf-surface); box-shadow: var(--hf-shadow); }.notifier-surface > header,.delivery-surface > header { min-height: 62px; padding: 13px 18px; border-bottom: 1px solid var(--hf-line); }.notifier-surface > header span,.delivery-surface > header span { color: var(--hf-muted); font-family: var(--hf-data); font-size: 12px; }.notifier-surface h3,.delivery-surface h3 { margin: 4px 0 0; color: var(--hf-ink); font-size: 14px; }.notifier-list article { display: grid; min-height: 76px; grid-template-columns: 38px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--hf-line); }.notifier-list article:last-child { border-bottom: 0; }.notifier-list__icon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--hf-line); border-radius: 10px; color: var(--hf-accent); }.notifier-list__identity strong,.notifier-list__identity small { display: block; }.notifier-list__identity strong { color: var(--hf-ink); font-size: 13px; }.notifier-list__identity small { margin-top: 5px; color: var(--hf-muted); font-size: 12px; }.notifier-list__actions { display: flex; align-items: center; gap: 3px; }.delivery-surface__error { max-width: 280px; overflow: hidden; color: var(--hf-muted); text-overflow: ellipsis; white-space: nowrap; }.notifier-modal__grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }.notifier-field-help { display: grid; gap: 4px; margin: -8px 0 20px; padding: 11px 13px; border: 1px solid var(--hf-line); background: var(--hf-surface-soft); color: var(--hf-muted); font-size: 12px; line-height: 1.55; }.notifier-field-help strong { color: var(--hf-ink); font-size: 12px; }.notifier-field-help span { display: block; }@media (max-width: 720px) { .notifier-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.notifier-list__actions { grid-column: 2 / -1; }.notifier-modal__grid { grid-template-columns: 1fr; gap: 0; }.notifier-field-help { margin-top: -4px; } }
+.reminder-surface,.bot-surface { overflow: hidden; border: 1px solid var(--hf-line); border-radius: var(--hf-radius); background: var(--hf-surface); box-shadow: var(--hf-shadow); }.notification-surface-heading { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 18px; border-bottom: 1px solid var(--hf-line); }.notification-surface-heading span { color: var(--hf-muted); font-family: var(--hf-data); font-size: 12px; }.notification-surface-heading h3 { margin: 4px 0 0; color: var(--hf-ink); font-size: 14px; }.notification-surface-heading p { margin: 4px 0 0; color: var(--hf-muted); font-size: 12px; }.reminder-list article { display: grid; min-height: 84px; grid-template-columns: 38px minmax(220px, 1fr) minmax(120px, auto) auto auto; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--hf-line); }.reminder-list article:last-child,.bot-list article:last-child { border-bottom: 0; }.reminder-list__icon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--hf-line); border-radius: 10px; color: var(--hf-accent); }.reminder-list__identity strong,.reminder-list__identity small,.reminder-list__identity em,.reminder-list__schedule span,.reminder-list__schedule small,.bot-list article strong,.bot-list article small,.bot-list article em { display: block; }.reminder-list__identity strong,.bot-list article strong { color: var(--hf-ink); font-size: 13px; }.reminder-list__identity small,.bot-list article small { margin-top: 4px; color: var(--hf-muted); font-size: 12px; }.reminder-list__identity em,.bot-list article em { margin-top: 5px; color: var(--hf-muted); font-size: 12px; font-style: normal; }.reminder-list__identity em.is-error,.bot-list article em.is-error { color: var(--hf-danger); }.reminder-list__schedule { text-align: right; }.reminder-list__schedule span { color: var(--hf-ink); font-size: 12px; }.reminder-list__schedule small { margin-top: 4px; color: var(--hf-muted); font-size: 12px; }.bot-list article { display: grid; min-height: 76px; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--hf-line); }.reminder-modal__note { display: grid; gap: 4px; margin: -4px 0 18px; padding: 11px 13px; border: 1px solid var(--hf-line); background: var(--hf-surface-soft); color: var(--hf-muted); font-size: 12px; line-height: 1.55; }.reminder-modal__note strong { color: var(--hf-ink); }@media (max-width: 820px) { .reminder-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.reminder-list__schedule { grid-column: 2; text-align: left; }.reminder-list__actions { grid-column: 2 / -1; }.notification-surface-heading { align-items: flex-start; } }@media (max-width: 520px) { .notification-surface-heading { flex-direction: column; }.notification-surface-heading .n-button { width: 100%; }.reminder-list article { grid-template-columns: 38px minmax(0, 1fr) auto; }.reminder-list__identity { min-width: 0; }.reminder-list__identity small { overflow-wrap: anywhere; } }
 </style>
 
 <style>

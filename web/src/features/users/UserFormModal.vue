@@ -107,13 +107,16 @@ async function submit() {
     :show="show"
     preset="card"
     :title="title"
-    class="user-form-modal"
+    class="user-form-modal compact-dialog"
     :bordered="false"
     :mask-closable="!saving"
     :close-on-esc="!saving"
+    :segmented="{ content: true, footer: true }"
+    :style="{ width: 'min(640px, calc(100vw - 32px))' }"
+    content-style="max-height: min(58vh, 420px); overflow-y: auto;"
     @update:show="emit('update:show', $event)"
   >
-    <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
+    <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" class="compact-form">
       <div class="form-grid">
         <n-form-item label="用户名" path="username">
           <n-input v-model:value="form.username" maxlength="32" placeholder="例如：alice" autofocus />

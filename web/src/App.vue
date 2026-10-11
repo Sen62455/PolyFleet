@@ -7,11 +7,7 @@ import { darkThemeOverrides, eyeThemeOverrides, lightThemeOverrides } from "./th
 
 const naiveTheme = computed(() => (colorMode.value === "dark" ? darkTheme : null));
 const activeThemeOverrides = computed(() =>
-  colorMode.value === "dark"
-    ? darkThemeOverrides
-    : colorMode.value === "eye"
-      ? eyeThemeOverrides
-      : lightThemeOverrides,
+  colorMode.value === "dark" ? darkThemeOverrides : colorMode.value === "eye" ? eyeThemeOverrides : lightThemeOverrides,
 );
 </script>
 

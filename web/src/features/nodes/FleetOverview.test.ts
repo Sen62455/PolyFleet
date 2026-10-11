@@ -47,7 +47,16 @@ describe("FleetOverview", () => {
   it("renders the report comparison and subscription health row", async () => {
     const wrapper = mount(FleetOverview, {
       props: {
-        nodes: [], alerts: [], loading: false, error: "",
+        nodes: [{
+          id: "node-1", name: "dmit2-reality", status: "online", adapter_type: "sing_box_vless_reality",
+          provider: "DMIT", region: "Los Angeles", public_host: "dmit2.lyyes.cn", public_port: 18443,
+          cpu_percent: 5.9, memory_used_bytes: 384 * 1024 ** 2, memory_total_bytes: 1.9 * 1024 ** 3,
+          disk_used_bytes: 4.8 * 1024 ** 3, disk_total_bytes: 19.6 * 1024 ** 3,
+          network_rx_bps: 5400, network_tx_bps: 5700, traffic_used_bytes: 560 * 1024 ** 2,
+          traffic_limit_bytes: 1024 ** 4, online_connections: 0, online_users: 0,
+          core_name: "sing-box", core_version: "1.13.18",
+        } as never],
+        alerts: [], loading: false, error: "",
         trends: {}, assets: {}, trafficReport: report, subscriptions: [subscription],
       },
     });
@@ -56,6 +65,10 @@ describe("FleetOverview", () => {
     expect(wrapper.text()).toContain("对比上月 +100.0%");
     expect(wrapper.text()).toContain("Reality subscription");
     expect(wrapper.text()).toContain("1 / 2");
+    expect(wrapper.text()).toContain("节点机柜");
+    expect(wrapper.text()).toContain("dmit2-reality");
+    expect(wrapper.find(".probe-card").exists()).toBe(true);
+    expect(wrapper.find(".rack-node__metrics").exists()).toBe(false);
     expect(wrapper.findAll("polyline")).toHaveLength(4);
 
     await wrapper.find(".subscription-health__row").trigger("click");

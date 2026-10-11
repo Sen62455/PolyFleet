@@ -24,6 +24,7 @@ describe("NodeFormModal", () => {
       name: "Pinned node",
       tls_cert_fingerprint: "AB:".repeat(31) + "AB",
       tls_public_key_sha256: "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=",
+      exit_proxy_id: "",
     });
     wrapper.unmount();
   });
@@ -75,6 +76,7 @@ describe("NodeFormModal", () => {
     await saveButton!.trigger("click");
     await flushPromises();
 
+    expect(wrapper.text()).toContain("链式出口");
     expect(wrapper.emitted("submit")?.[0]?.[0]).toMatchObject({
       adapter_type: "sing_box_vless_reality",
       public_port: 8443,

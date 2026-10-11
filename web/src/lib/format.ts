@@ -89,3 +89,13 @@ export const statusLabels: Record<NodeStatus, string> = {
 export function issueCount(nodes: NodeRecord[]): number {
   return nodes.filter((node) => ["stale", "offline", "degraded"].includes(node.status)).length;
 }
+
+// Shared presentation thresholds for resource and quota meters.
+export function severity(value: number): "normal" | "warning" | "critical" {
+  return value >= 90 ? "critical" : value >= 75 ? "warning" : "normal";
+}
+
+export function progressStatus(value: number): "default" | "warning" | "error" {
+  const level = severity(value);
+  return level === "critical" ? "error" : level === "warning" ? "warning" : "default";
+}

@@ -124,6 +124,19 @@ type clashVLESSRealityOptions struct {
 	ShortID   string `yaml:"short-id"`
 }
 
+type clashExitProxy struct {
+	Name           string `yaml:"name"`
+	Type           string `yaml:"type"`
+	Server         string `yaml:"server"`
+	Port           int    `yaml:"port"`
+	Username       string `yaml:"username,omitempty"`
+	Password       string `yaml:"password,omitempty"`
+	TLS            bool   `yaml:"tls,omitempty"`
+	SkipCertVerify bool   `yaml:"skip-cert-verify,omitempty"`
+	UDP            bool   `yaml:"udp,omitempty"`
+	DialerProxy    string `yaml:"dialer-proxy"`
+}
+
 type singBoxSubscription struct {
 	Outbounds []any `json:"outbounds"`
 }
@@ -263,6 +276,16 @@ func defaultClashTun() clashTun {
 }
 
 func renderSubscription(format string, subscription store.Subscription) (renderedSubscription, error) {
+	// Server forwarding is configured on the entry host. Export only the entry
+	// transport, keeping the route name, so the client never negotiates SOCKS again.
+	endpoints := append([]store.SubscriptionEndpoint(nil), subscription.Endpoints...)
+	for i := range endpoints {
+		if endpoints[i].Exit != nil && endpoints[i].Exit.ServerSide {
+			endpoints[i].NodeName = clashSelectableName(endpoints[i])
+			endpoints[i].Exit = nil
+		}
+	}
+	subscription.Endpoints = endpoints
 	switch format {
 	case "uri":
 		uris, err := subscriptionURIs(subscription)
@@ -284,7 +307,7 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 			Body:        []byte(base64.StdEncoding.EncodeToString([]byte(plain))),
 		}, nil
 	case "clash":
-		proxies := make([]any, 0, len(subscription.Endpoints))
+		proxies := make([]any, 0, len(subscription.Endpoints)*2)
 		proxyNames := make([]string, 0, len(subscription.Endpoints))
 		for _, endpoint := range subscription.Endpoints {
 			switch endpointProtocol(endpoint) {
@@ -309,7 +332,10 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 			default:
 				return renderedSubscription{}, store.ErrUnsupported
 			}
-			proxyNames = append(proxyNames, endpoint.NodeName)
+			if chained, ok := clashChainedExit(endpoint); ok {
+				proxies = append(proxies, chained)
+			}
+			proxyNames = append(proxyNames, clashSelectableName(endpoint))
 		}
 		proxyGroups := []clashProxyGroup{}
 		if len(proxyNames) == 0 {
@@ -330,7 +356,7 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 		}
 		body, err := yaml.Marshal(clashSubscription{
 			AllowLAN: false, Mode: "rule", LogLevel: "warning", IPv6: false,
-			UnifiedDelay: true, TCPConcurrent: true,
+			UnifiedDelay: false, TCPConcurrent: true,
 			Profile: clashProfile{StoreSelected: true, StoreFakeIP: true},
 			DNS:     defaultClashDNS(), Sniffer: defaultClashSniffer(), Tun: defaultClashTun(),
 			Proxies: proxies, ProxyGroups: proxyGroups, Rules: defaultClashRules(),
@@ -340,11 +366,12 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 		}
 		return renderedSubscription{ContentType: "application/yaml; charset=utf-8", Body: body}, nil
 	case "sing-box":
-		outbounds := make([]any, 0, len(subscription.Endpoints))
+		nodeOutbounds := make([]any, 0, len(subscription.Endpoints))
+		exitOutbounds := make([]any, 0, len(subscription.Endpoints))
 		for _, endpoint := range subscription.Endpoints {
 			switch endpointProtocol(endpoint) {
 			case "hysteria2":
-				outbounds = append(outbounds, singBoxHysteria2Outbound{
+				nodeOutbounds = append(nodeOutbounds, singBoxHysteria2Outbound{
 					Type: "hysteria2", Tag: endpoint.NodeName, Server: endpoint.PublicHost,
 					ServerPort: endpoint.PublicPort, Password: endpoint.Credential,
 					TLS: singBoxTLSData{
@@ -353,7 +380,7 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 					},
 				})
 			case "vless":
-				outbounds = append(outbounds, singBoxVLESSRealityOutbound{
+				nodeOutbounds = append(nodeOutbounds, singBoxVLESSRealityOutbound{
 					Type: "vless", Tag: endpoint.NodeName, Server: endpoint.PublicHost,
 					ServerPort: endpoint.PublicPort, UUID: endpoint.Credential,
 					Flow: realityFlow(endpoint), Network: realityNetwork(endpoint),
@@ -369,7 +396,11 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 			default:
 				return renderedSubscription{}, store.ErrUnsupported
 			}
+			if chained, ok := singBoxChainedExit(endpoint); ok {
+				exitOutbounds = append(exitOutbounds, chained)
+			}
 		}
+		outbounds := append(exitOutbounds, nodeOutbounds...)
 		body, err := json.MarshalIndent(singBoxSubscription{Outbounds: outbounds}, "", "  ")
 		if err != nil {
 			return renderedSubscription{}, fmt.Errorf("encode sing-box subscription: %w", err)
@@ -463,4 +494,62 @@ func optionalStringSlice(value string) []string {
 		return nil
 	}
 	return []string{value}
+}
+
+func clashSelectableName(endpoint store.SubscriptionEndpoint) string {
+	if endpoint.Exit == nil || endpoint.Exit.Name == "" {
+		return endpoint.NodeName
+	}
+	return endpoint.NodeName + " · " + endpoint.Exit.Name
+}
+
+func clashChainedExit(endpoint store.SubscriptionEndpoint) (clashExitProxy, bool) {
+	if endpoint.Exit == nil || endpoint.Exit.Host == "" || endpoint.Exit.Port < 1 {
+		return clashExitProxy{}, false
+	}
+	proxyType := endpoint.Exit.Protocol
+	if proxyType == "" {
+		proxyType = store.ExitProxyProtocolSOCKS5
+	}
+	chained := clashExitProxy{
+		Name: clashSelectableName(endpoint), Type: proxyType,
+		Server: endpoint.Exit.Host, Port: endpoint.Exit.Port,
+		Username: endpoint.Exit.Username, Password: endpoint.Exit.Password,
+		TLS: endpoint.Exit.TLS, SkipCertVerify: endpoint.Exit.SkipCertVerify,
+		UDP: endpoint.Exit.UDP, DialerProxy: endpoint.NodeName,
+	}
+	return chained, true
+}
+
+func singBoxChainedExit(endpoint store.SubscriptionEndpoint) (map[string]any, bool) {
+	if endpoint.Exit == nil || endpoint.Exit.Host == "" || endpoint.Exit.Port < 1 {
+		return nil, false
+	}
+	outbound := map[string]any{
+		"tag":         clashSelectableName(endpoint),
+		"server":      endpoint.Exit.Host,
+		"server_port": endpoint.Exit.Port,
+		"detour":      endpoint.NodeName,
+	}
+	if endpoint.Exit.Username != "" {
+		outbound["username"] = endpoint.Exit.Username
+	}
+	if endpoint.Exit.Password != "" {
+		outbound["password"] = endpoint.Exit.Password
+	}
+	switch endpoint.Exit.Protocol {
+	case store.ExitProxyProtocolHTTP:
+		outbound["type"] = "http"
+		if endpoint.Exit.TLS {
+			tls := map[string]any{"enabled": true}
+			if endpoint.Exit.SkipCertVerify {
+				tls["insecure"] = true
+			}
+			outbound["tls"] = tls
+		}
+	default:
+		outbound["type"] = "socks"
+		outbound["version"] = "5"
+	}
+	return outbound, true
 }

@@ -25,6 +25,9 @@ import type {
   UserRecord,
   BulkNodeAction,
   BulkNodeResult,
+  ExitProxyInput,
+  ExitProxyRecord,
+  LandingGuide,
   NodeAssetInput,
   NodeAssetRecord,
   NotificationNotifierInput,
@@ -318,6 +321,38 @@ export const api = {
       method: "POST",
       body: "{}",
     }),
+
+  async listExitProxies() {
+    const result = await request<{ exit_proxies: ExitProxyRecord[] }>("/api/v1/exit-proxies");
+    return result.exit_proxies;
+  },
+
+  createExitProxy: (input: ExitProxyInput) =>
+    request<ExitProxyRecord>("/api/v1/exit-proxies", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateExitProxy: (id: string, input: ExitProxyInput) =>
+    request<ExitProxyRecord>(`/api/v1/exit-proxies/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  deleteExitProxy: (id: string) =>
+    request<void>(`/api/v1/exit-proxies/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      body: "{}",
+    }),
+
+  replaceExitProxyNodes: (id: string, nodeIds: string[]) =>
+    request<ExitProxyRecord>(`/api/v1/exit-proxies/${encodeURIComponent(id)}/nodes`, {
+      method: "PUT",
+      body: JSON.stringify({ node_ids: nodeIds }),
+    }),
+
+  getExitProxyLandingGuide: (id: string) =>
+    request<LandingGuide>(`/api/v1/exit-proxies/${encodeURIComponent(id)}/landing-guide`),
 
   getSUIState: (nodeId: string) =>
     request<SUIState>(`/api/v1/nodes/${encodeURIComponent(nodeId)}/s-ui`),

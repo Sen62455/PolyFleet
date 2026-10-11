@@ -43,6 +43,11 @@ Token、筛选与渲染器进入同一订阅；只读导入仍不会进入订阅
 Base64 的原文是以换行分隔的代理 URI。Mihomo/Clash 输出可直接导入的完整配置：
 
 - `PolyFleet` 手动选择组、`自动选择` 延迟测试组和 `DIRECT` 兜底；
+- 若入口节点挂了出口代理，Clash 会把入口节点留作 `dialer-proxy`，策略组只暴露
+  `{节点} · {出口}` 链式线路；sing-box 使用对应 `detour`。此模式的 URI / Base64 仍直连入口。
+  已配置入口服务器转发的出口（`server_side: true`）只输出入口协议并保留组合名称，
+  各种订阅格式都经过入口服务器的出站路由，不再由客户端协商落地代理。
+  Clash 默认关闭统一延迟，测速包含本次网站连接握手及请求耗时；仍不等于完整网页加载时间。
 - Hysteria2 与 VLESS/TCP/Reality 均显式启用 UDP，VLESS 使用 `xudp` packet encoding；
 - fake-IP DNS、域名嗅探和默认关闭的 TUN 基线；
 - 内置私网及常用国内域名直连规则，其他流量由 `MATCH,PolyFleet` 接管。

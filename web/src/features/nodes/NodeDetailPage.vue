@@ -15,7 +15,6 @@ import { api, APIError } from "../../api";
 import MetricChart, { type ChartSeries } from "../../components/MetricChart.vue";
 import NodeSignalRail from "../../components/NodeSignalRail.vue";
 import StatusIndicator from "../../components/StatusIndicator.vue";
-import TrendSparkline from "../../components/TrendSparkline.vue";
 import {
   adapterLabels,
   formatBytes,
@@ -23,7 +22,9 @@ import {
   formatRate,
   formatUptime,
   percent,
+  progressStatus,
   relativeTime,
+  severity,
 } from "../../lib/format";
 import type { MetricRange, NodeMetricSeries, NodeRecord } from "../../types";
 import HostTelemetryPanel from "./HostTelemetryPanel.vue";
@@ -45,10 +46,7 @@ const metricRange = ref<MetricRange>("24h");
 const metrics = ref<NodeMetricSeries>({ range: "24h", step_seconds: 60, samples: [] });
 const metricsLoading = ref(false);
 const metricsError = ref("");
-const kpiTrends = ref<NodeMetricSeries>({ range: "6h", step_seconds: 60, samples: [] });
 const telemetryPanel = ref<InstanceType<typeof HostTelemetryPanel> | null>(null);
-type DetailSection = "performance" | "runtime" | "configuration";
-const activeSection = ref<DetailSection>("performance");
 type TrafficUnit = "GiB" | "TiB";
 const calibrationValue = ref(0);
 const calibrationUnit = ref<TrafficUnit>("GiB");
@@ -94,6 +92,11 @@ function meterWidth(value: number) {
   return `${Math.max(0, Math.min(100, value))}%`;
 }
 
+function loadTone(value: number) {
+  const level = severity(value);
+  return level === "normal" ? "" : `is-${level}`;
+}
+
 const labels = computed(() => metrics.value.samples.map((sample) => sample.bucket_at));
 const cpuSeries = computed<ChartSeries[]>(() => [{
   name: "CPU", color: "var(--hf-chart-primary)", values: metrics.value.samples.map((sample) => sample.cpu_percent),
@@ -117,29 +120,11 @@ const diskSeries = computed<ChartSeries[]>(() => [
   { name: "写入", color: "var(--hf-chart-tertiary)", values: metrics.value.samples.map((sample) => sample.disk_write_bytes_per_second) },
 ]);
 
-function kpiTrendValues(metric: "cpu" | "memory" | "disk") {
-  const samples = kpiTrends.value.samples;
-  if (metric === "cpu") return samples.map((s) => s.cpu_percent);
-  if (metric === "memory") return samples.map((s) => percent(s.memory_used_bytes, s.memory_total_bytes));
-  return samples.map((s) => percent(s.disk_used_bytes, s.disk_total_bytes));
-}
-
 async function loadMetrics(silent = false) {
   if (!silent) metricsLoading.value = true;
   metricsError.value = "";
   try {
     metrics.value = await api.getNodeMetrics(props.node.id, metricRange.value);
-    if (!silent) {
-      if (metricRange.value === "6h") {
-        kpiTrends.value = metrics.value;
-      } else {
-        api.getNodeMetrics(props.node.id, "6h")
-          .then((series) => { kpiTrends.value = series; })
-          .catch((error: unknown) => {
-            if (error instanceof APIError && error.status === 401) emit("session-expired");
-          });
-      }
-    }
   } catch (error) {
     if (error instanceof APIError && error.status === 401) {
       emit("session-expired");
@@ -208,85 +193,45 @@ async function calibrateTraffic() {
   }
 }
 
-const detailSections: Array<{ key: DetailSection; elementID: string }> = [
-  { key: "performance", elementID: "node-performance" },
-  { key: "runtime", elementID: "node-runtime" },
-  { key: "configuration", elementID: "node-configuration" },
-];
-
 let refreshTimer: number | undefined;
-let detailScrollRoot: HTMLElement | null = null;
-let detailScrollFrame: number | undefined;
-
-function syncActiveSection() {
-  detailScrollFrame = undefined;
-  if (!detailScrollRoot) return;
-
-  const activationLine = detailScrollRoot.getBoundingClientRect().top + 72;
-  let nextSection: DetailSection = "performance";
-  for (const section of detailSections) {
-    const element = document.getElementById(section.elementID);
-    if (element && element.getBoundingClientRect().top <= activationLine) nextSection = section.key;
-  }
-  activeSection.value = nextSection;
-}
-
-function scheduleSectionSync() {
-  if (detailScrollFrame !== undefined) return;
-  detailScrollFrame = window.requestAnimationFrame(syncActiveSection);
-}
-
-function markActiveSection(section: DetailSection) {
-  activeSection.value = section;
-}
-
 onMounted(() => {
   void loadMetrics();
-  detailScrollRoot = document.querySelector<HTMLElement>(".console-content > .n-layout-scroll-container");
-  detailScrollRoot?.addEventListener("scroll", scheduleSectionSync, { passive: true });
-  window.requestAnimationFrame(syncActiveSection);
   refreshTimer = window.setInterval(() => {
     if (document.visibilityState === "visible") void loadMetrics(true);
   }, 30_000);
 });
-onBeforeUnmount(() => {
-  window.clearInterval(refreshTimer);
-  detailScrollRoot?.removeEventListener("scroll", scheduleSectionSync);
-  if (detailScrollFrame !== undefined) window.cancelAnimationFrame(detailScrollFrame);
-});
+onBeforeUnmount(() => window.clearInterval(refreshTimer));
 watch(metricRange, () => void loadMetrics());
 watch(() => props.node.id, () => void loadMetrics());
 </script>
 
 <template>
-  <main class="workspace node-detail-page">
-    <div class="node-detail-page__breadcrumb">
+  <main class="workspace node-workbench">
+    <header class="node-workbench__hero">
       <n-button quaternary circle aria-label="返回节点" @click="emit('back')">
         <template #icon><n-icon><arrow-left /></n-icon></template>
       </n-button>
-      <span>节点</span><b>/</b><strong>{{ node.name }}</strong>
-    </div>
-    <header class="node-detail-header">
-      <div class="node-detail-header__identity">
-        <div class="node-detail-header__eyebrow">
+      <div class="node-workbench__identity">
+        <div class="node-workbench__title">
           <status-indicator :status="node.status" />
-          <span>{{ adapterLabels[node.adapter_type] }}</span>
+          <h1>{{ node.name }}</h1>
+          <small>{{ adapterLabels[node.adapter_type] }}</small>
         </div>
-        <h1>{{ node.name }}</h1>
-        <div class="node-detail-header__meta">
-          <span><map-pin :size="14" aria-hidden="true" />{{ [node.provider, node.region].filter(Boolean).join(" · ") || "未设置位置" }}</span>
-          <span><globe-2 :size="14" aria-hidden="true" />{{ endpointLabel(node) }}</span>
-          <span>Agent {{ node.agent_version || "未注册" }}</span>
+        <div class="node-workbench__meta">
+          <span><map-pin :size="14" />{{ [node.provider, node.region].filter(Boolean).join(" · ") || "未设置位置" }}</span>
+          <span class="mono"><globe-2 :size="14" />{{ endpointLabel(node) }}</span>
+          <span>心跳 {{ relativeTime(node.last_seen_at) }}</span>
+          <span>运行 {{ formatUptime(node.uptime_seconds) }}</span>
         </div>
       </div>
-      <div class="node-detail-header__actions">
+      <div class="node-workbench__actions">
         <n-tooltip trigger="hover">
           <template #trigger>
             <n-button circle secondary aria-label="刷新监控" :loading="metricsLoading" @click="refreshMonitoring">
               <template #icon><n-icon><refresh-cw /></n-icon></template>
             </n-button>
           </template>
-          刷新监控
+          刷新
         </n-tooltip>
         <n-button secondary @click="emit('edit', node)">
           <template #icon><n-icon><pencil /></n-icon></template>编辑
@@ -295,218 +240,51 @@ watch(() => props.node.id, () => void loadMetrics());
           <template #icon><n-icon><key-round /></n-icon></template>注册 Agent
         </n-button>
       </div>
-      <node-signal-rail :node="node" />
     </header>
 
-    <nav class="node-detail-nav" aria-label="节点详情导航">
-      <a
-        href="#node-performance"
-        :class="{ 'is-active': activeSection === 'performance' }"
-        :aria-current="activeSection === 'performance' ? 'location' : undefined"
-        @click="markActiveSection('performance')"
-      >性能轨迹</a>
-      <a
-        href="#node-runtime"
-        :class="{ 'is-active': activeSection === 'runtime' }"
-        :aria-current="activeSection === 'runtime' ? 'location' : undefined"
-        @click="markActiveSection('runtime')"
-      >进程与服务</a>
-      <a
-        href="#node-configuration"
-        :class="{ 'is-active': activeSection === 'configuration' }"
-        :aria-current="activeSection === 'configuration' ? 'location' : undefined"
-        @click="markActiveSection('configuration')"
-      >配置与运维</a>
-    </nav>
+    <article class="workbench-card workbench-card--rail">
+      <node-signal-rail :node="node" compact />
+    </article>
 
-    <section id="node-performance" class="node-performance-layout" aria-label="节点性能">
-      <div class="monitor-workspace node-performance-main" aria-label="历史监控">
-        <header class="monitor-workspace__heading">
-          <div>
-            <h2>性能轨迹</h2>
-            <span>{{ selectedRangeLabel }}<template v-if="metrics.step_seconds > 60"> · {{ Math.round(metrics.step_seconds / 60) }} 分钟聚合</template></span>
-          </div>
-          <div class="monitor-toolbar">
-            <div class="range-segment" aria-label="监控时间范围">
-              <button
-                v-for="item in ranges"
-                :key="item.value"
-                type="button"
-                :class="{ active: metricRange === item.value }"
-                :aria-pressed="metricRange === item.value"
-                @click="metricRange = item.value"
-              >{{ item.label }}</button>
-            </div>
-          </div>
+    <section class="node-workbench__split">
+      <article class="workbench-card">
+        <header>
+          <h2>当前负载</h2>
+          <small>{{ node.online_connections }} 连接 · {{ node.online_users }} 用户</small>
         </header>
-        <div v-if="metricsError" class="monitor-error">{{ metricsError }}</div>
-        <div v-if="metricsLoading && metrics.samples.length === 0" class="monitor-loading"><n-spin :size="26" /></div>
-        <section v-else class="monitor-grid monitor-ledger">
-          <article class="monitor-panel monitor-panel--cpu">
-            <header><h2>CPU 使用率</h2><span>{{ formatPercent(node.cpu_percent) }}</span></header>
-            <metric-chart label="CPU 使用率" :series="cpuSeries" :labels="labels" :value-formatter="(value) => `${value.toFixed(0)}%`" />
-          </article>
-          <article class="monitor-panel monitor-panel--memory">
-            <header><h2>内存与 Swap</h2><span>{{ formatBytes(node.memory_used_bytes) }} / {{ formatBytes(node.memory_total_bytes) }}</span></header>
-            <metric-chart label="内存与 Swap" :series="memorySeries" :labels="labels" :value-formatter="(value) => `${value.toFixed(0)}%`" />
-          </article>
-          <article class="monitor-panel monitor-panel--network">
-            <header><h2>网络速率</h2><span>{{ formatRate(node.network_rx_bps + node.network_tx_bps) }}</span></header>
-            <metric-chart label="网络速率" :series="networkSeries" :labels="labels" :value-formatter="formatRate" />
-          </article>
-          <article class="monitor-panel monitor-panel--disk">
-            <header><h2>磁盘 I/O</h2><span>{{ formatBytes(node.disk_read_bytes_per_second + node.disk_write_bytes_per_second) }}/s</span></header>
-            <metric-chart label="磁盘 I/O" :series="diskSeries" :labels="labels" :value-formatter="(value) => `${formatBytes(value)}/s`" />
-          </article>
-        </section>
-      </div>
-
-      <aside class="node-resource-rail" aria-label="当前资源">
-        <header class="node-resource-rail__heading">
-          <div><h2>当前资源</h2><span>心跳 {{ relativeTime(node.last_seen_at) }}</span></div>
-          <status-indicator :status="node.status" :show-label="false" />
-        </header>
-        <section class="host-kpis">
-          <article class="host-kpi host-kpi--primary">
-            <header><span>CPU 使用率</span><small>{{ node.cpu_cores || "-" }} 核</small></header>
+        <div class="probe-meters">
+          <div class="probe-meter" :class="loadTone(node.cpu_percent)">
+            <span>CPU</span>
+            <i><b :style="{ width: meterWidth(node.cpu_percent) }" /></i>
             <strong>{{ formatPercent(node.cpu_percent) }}</strong>
-            <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(node.cpu_percent) }" /></div>
-            <trend-sparkline :values="kpiTrendValues('cpu')" :label="`${node.name} CPU 六小时趋势`" />
-            <small>1 分钟负载 {{ node.load_1.toFixed(2) }}</small>
-          </article>
-          <article class="host-kpi host-kpi--primary">
-            <header><span>内存占用</span><small>{{ formatBytes(node.memory_total_bytes) }}</small></header>
+            <em>{{ node.cpu_cores || "-" }} 核 · 负载 {{ node.load_1.toFixed(2) }}</em>
+          </div>
+          <div class="probe-meter" :class="loadTone(memoryPercent)">
+            <span>内存</span>
+            <i><b :style="{ width: meterWidth(memoryPercent) }" /></i>
             <strong>{{ formatPercent(memoryPercent) }}</strong>
-            <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(memoryPercent) }" /></div>
-            <trend-sparkline :values="kpiTrendValues('memory')" :label="`${node.name} 内存六小时趋势`" color="var(--hf-flow)" />
-            <small>{{ formatBytes(node.memory_used_bytes) }} · Swap {{ formatBytes(node.swap_used_bytes) }}</small>
-          </article>
-          <article class="host-kpi host-kpi--primary">
-            <header><span>根分区</span><small>{{ formatBytes(node.disk_total_bytes) }}</small></header>
+            <em>{{ formatBytes(node.memory_used_bytes) }} / {{ formatBytes(node.memory_total_bytes) }}</em>
+          </div>
+          <div class="probe-meter" :class="loadTone(diskPercent)">
+            <span>磁盘</span>
+            <i><b :style="{ width: meterWidth(diskPercent) }" /></i>
             <strong>{{ formatPercent(diskPercent) }}</strong>
-            <div class="host-kpi__meter" aria-hidden="true"><i :style="{ width: meterWidth(diskPercent) }" /></div>
-            <trend-sparkline :values="kpiTrendValues('disk')" :label="`${node.name} 磁盘六小时趋势`" color="var(--hf-pressure)" />
-            <small>{{ formatBytes(node.disk_used_bytes) }} 已用</small>
-          </article>
-          <article class="host-kpi host-kpi--context">
-            <header><span>当前网络</span><small>接收 / 发送</small></header>
-            <strong><arrow-down :size="14" aria-hidden="true" />{{ formatRate(node.network_rx_bps) }}</strong>
-            <small><arrow-up :size="13" aria-hidden="true" />{{ formatRate(node.network_tx_bps) }}</small>
-          </article>
-          <article class="host-kpi host-kpi--context">
-            <header><span>运行时间</span><small>自上次启动</small></header>
-            <strong>{{ formatUptime(node.uptime_seconds) }}</strong>
-            <small>Agent {{ node.agent_version || "未注册" }}</small>
-          </article>
-        </section>
-      </aside>
-    </section>
+            <em>{{ formatBytes(node.disk_used_bytes) }} / {{ formatBytes(node.disk_total_bytes) }}</em>
+          </div>
+        </div>
+        <dl class="probe-facts">
+          <div><dt>下行</dt><dd><arrow-down :size="12" />{{ formatRate(node.network_rx_bps) }}</dd></div>
+          <div><dt>上行</dt><dd><arrow-up :size="12" />{{ formatRate(node.network_tx_bps) }}</dd></div>
+          <div><dt>流量</dt><dd>{{ formatBytes(node.traffic_used_bytes) }} / {{ node.traffic_limit_bytes ? formatBytes(node.traffic_limit_bytes) : "不限" }}</dd></div>
+          <div><dt>出口</dt><dd>{{ node.exit_proxy ? node.exit_proxy.name : "节点直出" }}</dd></div>
+          <div><dt>负载 5 / 15</dt><dd>{{ node.load_5.toFixed(2) }} / {{ node.load_15.toFixed(2) }}</dd></div>
+          <div><dt>Swap</dt><dd>{{ formatBytes(node.swap_used_bytes) }} / {{ formatBytes(node.swap_total_bytes) }}</dd></div>
+          <div><dt>运行时间</dt><dd>{{ formatUptime(node.uptime_seconds) }}</dd></div>
+          <div><dt>Agent</dt><dd>{{ node.agent_version || "尚未注册" }}</dd></div>
+        </dl>
+      </article>
 
-    <host-telemetry-panel
-      id="node-runtime"
-      ref="telemetryPanel"
-      :node-id="node.id"
-      @session-expired="emit('session-expired')"
-    />
-
-    <section id="node-configuration" class="node-detail-lower">
-      <div class="node-detail-column">
-        <section class="detail-band">
-          <h2>底层与累计指标</h2>
-          <dl class="detail-list detail-list--two">
-            <div><dt>CPU 核心</dt><dd>{{ node.cpu_cores || "-" }}</dd></div>
-            <div><dt>负载（1 / 5 / 15 分钟）</dt><dd>{{ node.load_1.toFixed(2) }} / {{ node.load_5.toFixed(2) }} / {{ node.load_15.toFixed(2) }}</dd></div>
-            <div><dt>磁盘读取 / 写入</dt><dd>{{ formatBytes(node.disk_read_bytes_per_second) }}/s / {{ formatBytes(node.disk_write_bytes_per_second) }}/s</dd></div>
-            <div><dt>网卡接收 / 发送</dt><dd>{{ formatRate(node.network_rx_bps) }} / {{ formatRate(node.network_tx_bps) }}</dd></div>
-            <div><dt>累计接收</dt><dd>{{ formatBytes(node.network_rx_bytes_total) }}</dd></div>
-            <div><dt>累计发送</dt><dd>{{ formatBytes(node.network_tx_bytes_total) }}</dd></div>
-          </dl>
-        </section>
-        <section class="detail-band">
-          <h2>系统信息</h2>
-          <dl class="detail-list detail-list--two">
-            <div><dt>主机名</dt><dd>{{ node.hostname || "尚未上报" }}</dd></div>
-            <div><dt>操作系统</dt><dd>{{ [node.os_name, node.os_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
-            <div><dt>架构</dt><dd>{{ node.architecture || "-" }}</dd></div>
-            <div><dt>内核</dt><dd>{{ node.kernel_version || "尚未上报" }}</dd></div>
-            <div><dt>Agent</dt><dd>{{ node.agent_version || "尚未注册" }}</dd></div>
-            <div><dt>核心</dt><dd>{{ [node.core_name, node.core_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
-            <div><dt>适配方式</dt><dd>{{ adapterLabels[node.adapter_type] }}</dd></div>
-            <div><dt>订阅端点</dt><dd>{{ endpointLabel(node) }}</dd></div>
-            <template v-if="node.adapter_type === 'sing_box_vless_reality'">
-              <div><dt>协议与传输</dt><dd>VLESS / TCP / Reality</dd></div>
-              <div><dt>SNI / 伪装域名</dt><dd>{{ node.sni || "未配置" }}</dd></div>
-              <div><dt>Reality 握手目标</dt><dd>{{ realityHandshakeLabel(node) }}</dd></div>
-              <div><dt>Reality 身份</dt><dd>{{ node.reality?.public_key && node.reality?.short_id ? `已应用 · 第 ${node.reality.applied_key_generation} 代` : "等待节点生成" }}</dd></div>
-              <div><dt>目标身份代际</dt><dd>{{ node.reality ? `第 ${node.reality.key_generation} 代${node.reality.key_generation !== node.reality.applied_key_generation ? " · 等待应用" : ""}` : "未配置" }}</dd></div>
-              <div><dt>身份应用版本</dt><dd>{{ node.reality?.material_applied_version || "尚未应用" }}</dd></div>
-            </template>
-            <template v-else>
-              <div><dt>证书固定</dt><dd>{{ node.tls_cert_fingerprint ? "已配置" : "未配置" }}</dd></div>
-              <div><dt>公钥固定</dt><dd>{{ node.tls_public_key_sha256 ? "已配置" : "未配置" }}</dd></div>
-            </template>
-          </dl>
-        </section>
-        <section class="detail-band detail-band--user-traffic">
-          <div class="detail-section__heading">
-            <h2>用户流量与在线</h2>
-          </div>
-          <dl class="detail-list detail-list--two">
-            <div><dt>在线用户 / 活跃连接</dt><dd>{{ node.online_users }} / {{ node.online_connections }}</dd></div>
-            <div><dt>未识别用户</dt><dd>{{ node.online_unknown_users }}</dd></div>
-            <div><dt>代理上传</dt><dd>{{ formatBytes(node.traffic_upload_bytes) }}</dd></div>
-            <div><dt>代理下载</dt><dd>{{ formatBytes(node.traffic_download_bytes) }}</dd></div>
-            <div><dt>最近流量上报</dt><dd>{{ relativeTime(node.traffic_last_report_at) }}</dd></div>
-            <div><dt>最近在线采样</dt><dd>{{ relativeTime(node.online_sampled_at) }}</dd></div>
-          </dl>
-        </section>
-        <section class="detail-band node-traffic-budget">
-          <div class="detail-section__heading">
-            <h2>月流量额度</h2>
-            <span>{{ trafficCycleLabel(node) }}</span>
-          </div>
-          <div class="node-traffic-budget__summary">
-            <strong>{{ formatBytes(node.traffic_used_bytes) }}</strong>
-            <span>/ {{ node.traffic_limit_bytes > 0 ? formatBytes(node.traffic_limit_bytes) : "不限额" }}</span>
-            <b>{{ trafficQuotaLabel }}</b>
-          </div>
-          <n-progress
-            v-if="node.traffic_limit_bytes > 0"
-            type="line"
-            :percentage="trafficQuotaPercent"
-            :show-indicator="false"
-            :status="node.traffic_used_bytes >= node.traffic_limit_bytes ? 'error' : 'success'"
-          />
-          <dl class="detail-list detail-list--two">
-            <div><dt>周期代理上传</dt><dd>{{ formatBytes(node.traffic_cycle_upload_bytes) }}</dd></div>
-            <div><dt>周期代理下载</dt><dd>{{ formatBytes(node.traffic_cycle_download_bytes) }}</dd></div>
-            <div><dt>双向代理合计</dt><dd>{{ formatBytes(cycleProxyUsed) }}</dd></div>
-            <div><dt>剩余额度</dt><dd>{{ node.traffic_limit_bytes > 0 ? formatBytes(trafficRemaining) : "不限额" }}</dd></div>
-            <div><dt>运营商校准值</dt><dd>{{ node.traffic_calibration_bytes === null ? "尚未校准" : formatBytes(node.traffic_calibration_bytes) }}</dd></div>
-            <div><dt>最近校准</dt><dd>{{ relativeTime(node.traffic_calibrated_at) }}</dd></div>
-          </dl>
-          <div class="node-traffic-budget__calibration">
-            <n-input-number
-              v-model:value="calibrationValue"
-              :min="0"
-              :max="8388607"
-              :precision="2"
-              aria-label="运营商本周期已用流量"
-              placeholder="运营商本周期已用量"
-            />
-            <n-select
-              v-model:value="calibrationUnit"
-              :options="trafficUnitOptions"
-              :consistent-menu-width="false"
-              aria-label="运营商流量单位"
-            />
-            <n-button type="primary" :loading="calibrationWorking" @click="calibrateTraffic">
-              校准用量
-            </n-button>
-          </div>
-        </section>
-      </div>
-      <div class="node-detail-column">
+      <article class="workbench-card workbench-card--ops">
         <node-operations-panel
           v-if="node.agent_installation_id"
           :node="node"
@@ -515,13 +293,506 @@ watch(() => props.node.id, () => void loadMetrics());
           @changed="emit('changed')"
           @session-expired="emit('session-expired')"
         />
-        <s-u-i-adapter-panel
-          v-if="node.adapter_type === 's_ui'"
-          :node="node"
-          @changed="emit('changed')"
-          @session-expired="emit('session-expired')"
-        />
-      </div>
+        <div v-else class="ops-empty">
+          <strong>尚未注册 Agent</strong>
+          <span>注册后可探测核心、重启、备份配置和 Ping。</span>
+          <n-button type="primary" size="small" @click="emit('enroll', node)">注册 Agent</n-button>
+        </div>
+      </article>
     </section>
+
+    <section class="workbench-card" aria-label="节点性能">
+      <header class="monitor-workspace__heading">
+        <div>
+          <h2>性能轨迹</h2>
+          <span>{{ selectedRangeLabel }}<template v-if="metrics.step_seconds > 60"> · {{ Math.round(metrics.step_seconds / 60) }} 分钟聚合</template></span>
+        </div>
+        <div class="range-segment" aria-label="监控时间范围">
+          <button
+            v-for="item in ranges"
+            :key="item.value"
+            type="button"
+            :class="{ active: metricRange === item.value }"
+            :aria-pressed="metricRange === item.value"
+            @click="metricRange = item.value"
+          >{{ item.label }}</button>
+        </div>
+      </header>
+      <div v-if="metricsError" class="monitor-error">{{ metricsError }}</div>
+      <div v-if="metricsLoading && metrics.samples.length === 0" class="monitor-loading"><n-spin :size="26" /></div>
+      <section v-else class="monitor-grid monitor-ledger">
+        <article class="monitor-panel monitor-panel--cpu">
+          <header><h2>CPU 使用率</h2><span>{{ formatPercent(node.cpu_percent) }}</span></header>
+          <metric-chart label="CPU 使用率" :series="cpuSeries" :labels="labels" :value-formatter="(value) => `${value.toFixed(0)}%`" />
+        </article>
+        <article class="monitor-panel monitor-panel--memory">
+          <header><h2>内存与 Swap</h2><span>{{ formatBytes(node.memory_used_bytes) }} / {{ formatBytes(node.memory_total_bytes) }}</span></header>
+          <metric-chart label="内存与 Swap" :series="memorySeries" :labels="labels" :value-formatter="(value) => `${value.toFixed(0)}%`" />
+        </article>
+        <article class="monitor-panel monitor-panel--network">
+          <header><h2>网络速率</h2><span>{{ formatRate(node.network_rx_bps + node.network_tx_bps) }}</span></header>
+          <metric-chart label="网络速率" :series="networkSeries" :labels="labels" :value-formatter="formatRate" />
+        </article>
+        <article class="monitor-panel monitor-panel--disk">
+          <header><h2>磁盘 I/O</h2><span>{{ formatBytes(node.disk_read_bytes_per_second + node.disk_write_bytes_per_second) }}/s</span></header>
+          <metric-chart label="磁盘 I/O" :series="diskSeries" :labels="labels" :value-formatter="(value) => `${formatBytes(value)}/s`" />
+        </article>
+      </section>
+    </section>
+
+    <section class="node-workbench__split">
+      <article class="workbench-card">
+        <header>
+          <h2>系统信息</h2>
+          <small>{{ node.hostname || "尚未上报主机名" }}</small>
+        </header>
+        <dl class="detail-list detail-list--two">
+          <div><dt>操作系统</dt><dd>{{ [node.os_name, node.os_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
+          <div><dt>架构 / 内核</dt><dd>{{ [node.architecture || "-", node.kernel_version].filter(Boolean).join(" · ") }}</dd></div>
+          <div><dt>Agent / 核心</dt><dd>{{ node.agent_version || "尚未注册" }} · {{ [node.core_name, node.core_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
+          <div><dt>负载 1 / 5 / 15</dt><dd>{{ node.load_1.toFixed(2) }} / {{ node.load_5.toFixed(2) }} / {{ node.load_15.toFixed(2) }}</dd></div>
+          <div><dt>累计收发</dt><dd>{{ formatBytes(node.network_rx_bytes_total) }} / {{ formatBytes(node.network_tx_bytes_total) }}</dd></div>
+          <div><dt>在线 / 未识别</dt><dd>{{ node.online_users }} 用户 · {{ node.online_unknown_users }} 未识别</dd></div>
+          <div>
+            <dt>出口代理</dt>
+            <dd>{{ node.exit_proxy ? `${node.exit_proxy.name} · ${node.exit_proxy.host}:${node.exit_proxy.port}` : "节点直出" }}</dd>
+          </div>
+          <template v-if="node.adapter_type === 'sing_box_vless_reality'">
+            <div><dt>SNI / 握手</dt><dd>{{ node.sni || "未配置" }} · {{ realityHandshakeLabel(node) }}</dd></div>
+            <div><dt>Reality 身份</dt><dd>{{ node.reality?.public_key && node.reality?.short_id ? `已应用 · 第 ${node.reality.applied_key_generation} 代` : "等待节点生成" }}</dd></div>
+          </template>
+          <template v-else>
+            <div><dt>证书 / 公钥固定</dt><dd>{{ node.tls_cert_fingerprint ? "证书已配置" : "证书未配置" }} · {{ node.tls_public_key_sha256 ? "公钥已配置" : "公钥未配置" }}</dd></div>
+          </template>
+        </dl>
+      </article>
+
+      <article class="workbench-card node-traffic-budget">
+        <header>
+          <h2>月流量额度</h2>
+          <small>{{ trafficCycleLabel(node) }}</small>
+        </header>
+        <div class="node-traffic-budget__summary">
+          <strong>{{ formatBytes(node.traffic_used_bytes) }}</strong>
+          <span>/ {{ node.traffic_limit_bytes > 0 ? formatBytes(node.traffic_limit_bytes) : "不限额" }}</span>
+          <b>{{ trafficQuotaLabel }}</b>
+        </div>
+        <n-progress
+          v-if="node.traffic_limit_bytes > 0"
+          type="line"
+          :percentage="trafficQuotaPercent"
+          :show-indicator="false"
+          :status="progressStatus(trafficQuotaPercent)"
+        />
+        <dl class="detail-list detail-list--two">
+          <div><dt>周期上传 / 下载</dt><dd>{{ formatBytes(node.traffic_cycle_upload_bytes) }} / {{ formatBytes(node.traffic_cycle_download_bytes) }}</dd></div>
+          <div><dt>双向合计 / 剩余</dt><dd>{{ formatBytes(cycleProxyUsed) }} / {{ node.traffic_limit_bytes > 0 ? formatBytes(trafficRemaining) : "不限额" }}</dd></div>
+          <div><dt>运营商校准</dt><dd>{{ node.traffic_calibration_bytes === null ? "尚未校准" : formatBytes(node.traffic_calibration_bytes) }}</dd></div>
+          <div><dt>最近校准</dt><dd>{{ relativeTime(node.traffic_calibrated_at) }}</dd></div>
+        </dl>
+        <div class="node-traffic-budget__calibration">
+          <n-input-number
+            v-model:value="calibrationValue"
+            :min="0"
+            :max="8388607"
+            :precision="2"
+            aria-label="运营商本周期已用流量"
+            placeholder="运营商本周期已用量"
+          />
+          <n-select
+            v-model:value="calibrationUnit"
+            :options="trafficUnitOptions"
+            :consistent-menu-width="false"
+            aria-label="运营商流量单位"
+          />
+          <n-button type="primary" :loading="calibrationWorking" @click="calibrateTraffic">
+            校准用量
+          </n-button>
+        </div>
+      </article>
+    </section>
+
+    <host-telemetry-panel
+      ref="telemetryPanel"
+      :node-id="node.id"
+      @session-expired="emit('session-expired')"
+    />
+
+    <s-u-i-adapter-panel
+      v-if="node.adapter_type === 's_ui'"
+      :node="node"
+      @changed="emit('changed')"
+      @session-expired="emit('session-expired')"
+    />
   </main>
 </template>
+
+<style scoped>
+.node-workbench {
+  display: grid;
+  gap: 16px;
+}
+
+.node-workbench__hero {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-workbench__identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.node-workbench__title {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.node-workbench__title h1 {
+  overflow: hidden;
+  margin: 0;
+  min-width: 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-workbench__title small {
+  flex: 0 0 auto;
+  color: var(--hf-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.node-workbench__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-top: 6px;
+  color: var(--hf-muted);
+  font-size: 12px;
+}
+
+.node-workbench__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.node-workbench__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-workbench__split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.node-workbench__split > .workbench-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workbench-card {
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--hf-line);
+  border-radius: var(--hf-radius);
+  background: var(--hf-surface);
+  box-shadow: var(--hf-shadow);
+}
+
+.workbench-card--rail {
+  padding: 0;
+}
+
+.workbench-card > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.workbench-card > header h2,
+.node-workbench :deep(.monitor-workspace__heading h2) {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.workbench-card > header small,
+.node-workbench :deep(.monitor-workspace__heading span) {
+  color: var(--hf-muted);
+  font-size: 12px;
+}
+
+.node-workbench :deep(.monitor-workspace__heading) {
+  min-height: 0;
+  margin: 0 0 14px;
+}
+
+.probe-meters {
+  display: grid;
+  flex: 1;
+  align-content: space-evenly;
+  gap: 10px;
+}
+
+.probe-meter {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.probe-meter span {
+  color: var(--hf-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.probe-meter i {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--hf-line-strong) 80%, transparent);
+}
+
+.probe-meter i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hf-accent);
+}
+
+.probe-meter.is-warning i b {
+  background: var(--hf-pressure);
+}
+
+.probe-meter.is-critical i b {
+  background: var(--hf-critical);
+}
+
+.probe-meter strong {
+  font-family: var(--hf-data);
+  font-size: 12px;
+  font-weight: 620;
+  text-align: right;
+}
+
+.probe-meter em {
+  grid-column: 2 / 3;
+  margin-top: -4px;
+  color: var(--hf-muted);
+  font-family: var(--hf-data);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.probe-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hf-line);
+}
+
+.probe-facts dt {
+  color: var(--hf-muted);
+  font-size: 12px;
+}
+
+.probe-facts dd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 3px 0 0;
+  font-family: var(--hf-data);
+  font-size: 12px;
+}
+
+.ops-empty {
+  display: grid;
+  flex: 1;
+  min-height: 180px;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.ops-empty strong {
+  font-size: 14px;
+}
+
+.ops-empty span {
+  color: var(--hf-muted);
+  font-size: 12px;
+}
+
+.node-workbench :deep(.operations-panel.detail-section) {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+}
+
+.node-workbench :deep(.operations-panel .detail-section__heading) {
+  margin-bottom: 10px;
+}
+
+.node-workbench :deep(.operations-panel .detail-section__heading h2) {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.node-workbench :deep(.operations-toolbar) {
+  margin-bottom: 10px;
+}
+
+.node-workbench :deep(.ping-tool) { display: block; padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--hf-line); background: var(--hf-surface-muted); }
+
+.node-workbench :deep(.ping-tool__identity span),
+.node-workbench :deep(.ping-tool > small) {
+  display: block;
+}
+
+.node-workbench :deep(.ping-tool__controls) {
+  flex: 1;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+}
+
+.node-workbench :deep(.operation-list) {
+  flex: 1;
+  min-height: 0;
+  margin-top: auto;
+  overflow-y: auto;
+  border-top: 1px solid var(--hf-line);
+}
+
+.node-workbench :deep(.operation-item) {
+  padding: 8px 0;
+}
+
+.node-workbench :deep(.node-signal-rail--compact) {
+  padding: 0;
+}
+
+.node-workbench :deep(.node-signal-rail) {
+  gap: 0;
+}
+
+.node-workbench :deep(.node-signal-rail__stage) { min-height: 0; padding: 16px 18px; border: 0; border-radius: 0; background: transparent; }
+
+.node-workbench :deep(.node-signal-rail__stage > span) {
+  background: transparent;
+}
+
+.node-workbench :deep(.telemetry-workspace) {
+  margin-top: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--hf-line);
+  border-radius: var(--hf-radius);
+  background: var(--hf-surface);
+  box-shadow: var(--hf-shadow);
+}
+
+.node-workbench :deep(.telemetry-heading) {
+  min-height: 0;
+  margin-bottom: 12px;
+}
+
+.node-workbench :deep(.telemetry-section) {
+  border-radius: 12px;
+}
+
+.node-workbench :deep(.monitor-panel) {
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.node-workbench :deep(.range-segment) {
+  overflow: hidden;
+  border-radius: var(--hf-radius-pill);
+}
+
+.node-traffic-budget :deep(.n-progress) {
+  margin: 0 0 16px;
+}
+
+.node-traffic-budget .detail-list {
+  margin-top: 2px;
+}
+
+.node-traffic-budget__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.node-traffic-budget__summary strong {
+  font-family: var(--hf-data);
+  font-size: 28px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+}
+
+.node-traffic-budget__summary span,
+.node-traffic-budget__summary b {
+  color: var(--hf-muted);
+  font-size: 12px;
+}
+
+.node-traffic-budget__calibration {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px auto;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 1080px) {
+  .node-workbench__split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .node-workbench__hero {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .node-workbench__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .node-traffic-budget__calibration {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

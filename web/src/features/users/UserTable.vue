@@ -2,7 +2,7 @@
 import { h } from "vue";
 import { Archive, MoreHorizontal, Pencil, Settings2, Wifi } from "@lucide/vue";
 import { NButton, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
-import { formatBytes, formatDateTime } from "../../lib/format";
+import { formatBytes, formatDateTime, percent, severity } from "../../lib/format";
 import type { UserRecord } from "../../types";
 
 defineProps<{
@@ -78,6 +78,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
         >
           <td>
             <div class="user-identity">
+              <span class="user-avatar" aria-hidden="true">{{ (user.display_name || user.username).slice(0, 1).toUpperCase() }}</span>
               <span>
                 <strong>{{ user.display_name || user.username }}</strong>
                 <small>@{{ user.username }}</small>
@@ -85,12 +86,14 @@ function syncState(user: UserRecord): { label: string; state: string } {
             </div>
           </td>
           <td>
-            <span class="status-marker" :class="`status-marker--${user.status}`">
-              <i aria-hidden="true" />{{ statusLabels[user.status] }}
-            </span>
-            <span class="table-secondary online-inline" :class="{ 'online-inline--active': user.online_connections > 0 }">
-              <wifi :size="12" aria-hidden="true" />{{ user.online_connections }} 个连接
-            </span>
+            <div class="user-status-stack">
+              <span class="status-marker" :class="`status-marker--${user.status}`">
+                <i aria-hidden="true" />{{ statusLabels[user.status] }}
+              </span>
+              <span class="table-secondary online-inline" :class="{ 'online-inline--active': user.online_connections > 0 }">
+                <wifi :size="12" aria-hidden="true" /> {{ user.online_connections }} 个连接
+              </span>
+            </div>
           </td>
           <td>
             <div v-if="user.assignments.length" class="assignment-inline">
@@ -106,6 +109,9 @@ function syncState(user: UserRecord): { label: string; state: string } {
               {{ formatBytes(user.traffic_used_bytes) }}
             </span>
             <span class="table-secondary">{{ user.traffic_limit_bytes ? `共 ${formatBytes(user.traffic_limit_bytes)}` : "不限额" }}</span>
+<i v-if="user.traffic_limit_bytes" class="traffic-bar" :class="`is-${severity(percent(user.traffic_used_bytes, user.traffic_limit_bytes))}`">
+  <b :style="{ width: `${percent(user.traffic_used_bytes, user.traffic_limit_bytes)}%` }" />
+</i>
           </td>
           <td><span class="user-expiry">{{ formatDateTime(user.expires_at) }}</span></td>
           <td>
@@ -148,6 +154,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
       >
         <header>
           <div class="user-identity">
+              <span class="user-avatar" aria-hidden="true">{{ (user.display_name || user.username).slice(0, 1).toUpperCase() }}</span>
             <span>
               <strong>{{ user.display_name || user.username }}</strong>
               <small>@{{ user.username }}</small>
@@ -160,7 +167,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
           </span>
           <span>{{ user.assignments.length }} 个节点</span>
           <span class="online-inline" :class="{ 'online-inline--active': user.online_connections > 0 }">
-            <wifi :size="12" aria-hidden="true" />{{ user.online_connections }} 个连接
+            <wifi :size="12" aria-hidden="true" /> {{ user.online_connections }} 个连接
           </span>
         </div>
         <footer>
@@ -170,6 +177,9 @@ function syncState(user: UserRecord): { label: string; state: string } {
             <i aria-hidden="true" />{{ syncState(user).label }}
           </span>
         </footer>
+<i v-if="user.traffic_limit_bytes" class="traffic-bar" :class="`is-${severity(percent(user.traffic_used_bytes, user.traffic_limit_bytes))}`">
+  <b :style="{ width: `${percent(user.traffic_used_bytes, user.traffic_limit_bytes)}%` }" />
+</i>
       </button>
       <div class="user-mobile-item__menu" @click.stop @keydown.stop>
         <n-dropdown trigger="click" :options="options" @select="choose($event, user)">
