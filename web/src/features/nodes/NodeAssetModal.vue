@@ -26,7 +26,7 @@ const emit = defineEmits<{
 const plan = ref("");
 const purchasedAt = ref<number | null>(null);
 const expiresAt = ref<number | null>(null);
-const renewalCycleMonths = ref(12);
+const renewalCycleMonths = ref<number | null>(12);
 const autoRenew = ref(false);
 const notes = ref("");
 
@@ -35,7 +35,7 @@ watch(() => props.show, (show) => {
   plan.value = props.asset?.plan ?? "";
   purchasedAt.value = props.asset?.purchased_at ? new Date(props.asset.purchased_at).getTime() : null;
   expiresAt.value = props.asset?.expires_at ? new Date(props.asset.expires_at).getTime() : null;
-  renewalCycleMonths.value = props.asset?.renewal_cycle_months || 12;
+  renewalCycleMonths.value = props.asset?.renewal_cycle_months ?? 12;
   autoRenew.value = props.asset?.auto_renew ?? false;
   notes.value = props.asset?.notes ?? "";
 });
@@ -49,7 +49,7 @@ function submit() {
     plan: plan.value.trim(),
     purchased_at: iso(purchasedAt.value),
     expires_at: iso(expiresAt.value),
-    renewal_cycle_months: renewalCycleMonths.value,
+    renewal_cycle_months: renewalCycleMonths.value ?? 0,
     auto_renew: autoRenew.value,
     notes: notes.value.trim(),
   });
@@ -86,7 +86,7 @@ function submit() {
             <n-input-number v-model:value="renewalCycleMonths" :min="0" :max="120" style="width: 100%" />
           </n-form-item>
           <div class="switch-row switch-row--compact">
-            <div><strong>自动续费</strong></div>
+            <div><strong>自动续费</strong><p class="asset-auto-renew-hint">记录供应商侧设置，不会触发付款</p></div>
             <n-switch v-model:value="autoRenew" aria-label="自动续费" />
           </div>
         </section>
@@ -114,6 +114,7 @@ function submit() {
 </template>
 
 <style scoped>
+.asset-auto-renew-hint { margin: 4px 0 0; color: var(--hf-muted); font-size: var(--fs-xs); }
 .asset-form__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);

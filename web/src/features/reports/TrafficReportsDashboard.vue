@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { ArrowDown, ArrowUp, BarChart3, RefreshCw, Server, TrendingDown, TrendingUp, UsersRound, Zap } from "@lucide/vue";
-import { NButton, NIcon, NSpin, NTooltip, useMessage } from "naive-ui";
+import { ArrowDown, ArrowUp, BarChart3, ChevronDown, Download, RefreshCw, Server, TrendingDown, TrendingUp, UsersRound, Zap } from "@lucide/vue";
+import { NAlert, NButton, NDropdown, NIcon, NSpin, NTooltip, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import StatCard from "../../components/StatCard.vue";
 import TrafficTrendChart from "../../components/TrafficTrendChart.vue";
 import { formatBytes } from "../../lib/format";
+import { downloadText, localDate } from "../../lib/export";
+import { trafficReportCSV, type ReportExport } from "./reportExport";
 import type { TrafficReport } from "../../types";
 
 const emit = defineEmits<{ "session-expired": [] }>();
@@ -14,6 +16,18 @@ const report = ref<TrafficReport | null>(null);
 const range = ref<"7d" | "30d">("30d");
 const loading = ref(true);
 const refreshing = ref(false);
+const loadError = ref("");
+const exportOptions = computed(() => [
+  { label: "每日用量 CSV", key: "daily", disabled: !report.value?.daily.length },
+  { label: "当前用户排行 CSV", key: "users", disabled: !report.value?.top_users.length },
+  { label: "当前节点排行 CSV", key: "nodes", disabled: !report.value?.top_nodes.length },
+]);
+
+function exportReport(kind: ReportExport) {
+  if (!report.value || refreshing.value) return;
+  downloadText(`polyfleet-traffic-${report.value.range}-${kind}-${localDate(new Date())}.csv`, trafficReportCSV(report.value, kind));
+  message.success("报表已导出");
+}
 
 const change = computed(() => {
   if (!report.value) return 0;
@@ -38,11 +52,13 @@ async function load() {
   if (refreshing.value) return;
   refreshing.value = true;
   loading.value = report.value === null;
+  loadError.value = "";
   try {
     report.value = await api.trafficReport(range.value);
   } catch (error) {
     if (error instanceof APIError && error.status === 401) emit("session-expired");
-    else message.error(error instanceof APIError ? error.message : "流量报表加载失败。");
+    else loadError.value = error instanceof APIError ? error.message : "流量报表加载失败。";
+    if (report.value) range.value = report.value.range;
   } finally {
     refreshing.value = false;
     loading.value = false;
@@ -50,6 +66,7 @@ async function load() {
 }
 
 function setRange(value: "7d" | "30d") {
+  if (refreshing.value) return;
   range.value = value;
   void load();
 }
@@ -61,9 +78,14 @@ onMounted(() => load());
   <main class="workspace operations-workspace report-workspace">
     <div class="page-heading page-heading--console">
       <div><h2>流量报表</h2><p>按控制面已接收批次统计，上下行合计为双向用量</p></div>
-      <div class="page-heading__actions"><div class="ops-segments"><button :class="{ 'is-active': range === '7d' }" type="button" @click="setRange('7d')">7 天</button><button :class="{ 'is-active': range === '30d' }" type="button" @click="setRange('30d')">30 天</button></div><n-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新报表" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</n-tooltip></div>
+      <div class="page-heading__actions">
+        <div class="ops-segments"><button :class="{ 'is-active': range === '7d' }" :disabled="refreshing" type="button" @click="setRange('7d')">7 天</button><button :class="{ 'is-active': range === '30d' }" :disabled="refreshing" type="button" @click="setRange('30d')">30 天</button></div>
+        <n-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新报表" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</n-tooltip>
+        <n-dropdown trigger="click" :options="exportOptions" @select="exportReport"><n-button secondary :disabled="!report || refreshing"><template #icon><n-icon><download /></n-icon></template>导出报表<chevron-down :size="14" style="margin-left: 8px" /></n-button></n-dropdown>
+      </div>
     </div>
 
+    <n-alert v-if="loadError" type="error" :show-icon="false"><div class="alert-row"><span>{{ loadError }}</span><n-button text type="error" @click="load">重新加载</n-button></div></n-alert>
     <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
 <template v-else-if="report">
   <section class="stat-grid" aria-label="流量摘要">

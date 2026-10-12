@@ -5,6 +5,7 @@ import {
   BarChart3,
   BellRing,
   Cable,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -15,8 +16,9 @@ import {
 } from "@lucide/vue";
 import { NTooltip } from "naive-ui";
 import BrandMark from "./BrandMark.vue";
+import { consolePages, type DashboardView } from "../lib/navigation";
 
-type NavigationView = "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
+type NavigationView = DashboardView;
 
 const props = withDefaults(defineProps<{
   activeView: NavigationView;
@@ -32,16 +34,8 @@ const emit = defineEmits<{
   collapse: [];
 }>();
 
-const navigation = [
-  { key: "overview" as const, label: "总览", icon: LayoutDashboard, group: "监控" },
-  { key: "nodes" as const, label: "节点", icon: Server, group: "监控" },
-  { key: "users" as const, label: "用户", icon: UsersRound, group: "管理" },
-  { key: "exits" as const, label: "出口代理", icon: Cable, group: "管理" },
-  { key: "subscriptions" as const, label: "订阅运营", icon: KeyRound, group: "运营" },
-  { key: "reports" as const, label: "流量报表", icon: BarChart3, group: "运营" },
-  { key: "notifications" as const, label: "告警通知", icon: BellRing, group: "运营" },
-  { key: "operations" as const, label: "操作记录", icon: ClipboardList, group: "审计" },
-];
+const icons = { overview: LayoutDashboard, nodes: Server, users: UsersRound, assets: CalendarClock, exits: Cable, subscriptions: KeyRound, reports: BarChart3, notifications: BellRing, operations: ClipboardList };
+const navigation = consolePages.map((page) => ({ ...page, icon: icons[page.key] }));
 
 const segmentCount = computed(() => Math.min(props.total, 12));
 const onlineSegments = computed(() => props.total ? Math.round(props.online / props.total * segmentCount.value) : 0);

@@ -6,6 +6,7 @@ import {
 	Menu as MenuIcon,
   Plus,
   RefreshCw,
+  Search,
   Server,
 } from "@lucide/vue";
 import {
@@ -30,6 +31,8 @@ import {
 import { api, APIError } from "../../api";
 import ColorModePicker from "../../components/ColorModePicker.vue";
 import ConsoleNavigation from "../../components/ConsoleNavigation.vue";
+import QuickSwitcher from "../../components/QuickSwitcher.vue";
+import { consolePages, dashboardHash, parseDashboardHash, type DashboardRoute, type DashboardView, type PageView } from "../../lib/navigation";
 import { issueCount } from "../../lib/format";
 import type {
   AlertRecord,
@@ -66,6 +69,9 @@ const NotificationDashboard = defineAsyncComponent(
 const ExitProxyDashboard = defineAsyncComponent(
   () => import("../exits/ExitProxyDashboard.vue"),
 );
+const AssetsDashboard = defineAsyncComponent(
+  () => import("../assets/AssetsDashboard.vue"),
+);
 
 const props = defineProps<{ session: Session }>();
 const emit = defineEmits<{ logout: []; "session-expired": [] }>();
@@ -84,19 +90,20 @@ const loadError = ref("");
 const formOpen = ref(false);
 const saving = ref(false);
 const editingNode = ref<NodeRecord | null>(null);
-const detailNodeID = ref<string | null>(null);
+const initialRoute = parseDashboardHash(window.location.hash);
+const detailNodeID = ref<string | null>(initialRoute.view === "node-detail" ? initialRoute.nodeId : null);
 const enrollmentNode = ref<NodeRecord | null>(null);
 const assetNode = ref<NodeRecord | null>(null);
 const assetSaving = ref(false);
-type DashboardView = "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations" | "node-detail";
-const activeView = ref<DashboardView>("overview");
+const activeView = ref<DashboardView>(initialRoute.view);
 const consoleContent = ref<InstanceType<typeof NLayoutContent> | null>(null);
 watch([activeView, detailNodeID], async () => {
   await nextTick();
   consoleContent.value?.scrollTo({ top: 0, left: 0 });
 });
-const detailReturnView = ref<"overview" | "nodes" | "users" | "operations">("overview");
-const operationsNodeFilter = ref("");
+const detailReturnView = ref<PageView>(initialRoute.view === "node-detail" ? initialRoute.from : "nodes");
+const operationsNodeFilter = ref(initialRoute.view === "operations" ? initialRoute.nodeId ?? "" : "");
+const quickSwitcherOpen = ref(false);
 const alerts = ref<AlertRecord[]>([]);
 const alertsOpen = ref(false);
 const alertsLoading = ref(false);
@@ -120,18 +127,8 @@ const pendingCount = computed(() => nodes.value.filter((node) => node.status ===
 const issues = computed(() => issueCount(nodes.value));
 const detailNode = computed(() => nodes.value.find((node) => node.id === detailNodeID.value) ?? null);
 const assetByNode = computed(() => Object.fromEntries(nodeAssets.value.map((asset) => [asset.node_id, asset])));
-const pageTitle = computed(() => {
-	if (activeView.value === "overview") return "总览";
-	if (activeView.value === "nodes") return "节点";
-	if (activeView.value === "users") return "用户";
-	if (activeView.value === "exits") return "出口代理";
-	if (activeView.value === "subscriptions") return "订阅运营";
-	if (activeView.value === "reports") return "流量报表";
-	if (activeView.value === "notifications") return "告警通知";
-	if (activeView.value === "operations") return "操作记录";
-	return "节点详情";
-});
-const pageGroup = computed(() => ({ overview: "监控", nodes: "监控", "node-detail": "监控", users: "管理", exits: "管理", subscriptions: "运营", reports: "运营", notifications: "运营", operations: "审计" })[activeView.value]);
+const pageTitle = computed(() => consolePages.find((page) => page.key === activeView.value)?.label ?? "节点详情");
+const pageGroup = computed(() => consolePages.find((page) => page.key === activeView.value)?.group ?? "监控");
 const headerStatus = computed(() => {
   return issues.value ? `${issues.value} 台节点需关注` : "系统正常";
 });
@@ -246,15 +243,39 @@ function openSelectedNodes(nodeIDs: string[]) {
   navigate("nodes");
 }
 
-function openNode(nodeId: string, from: "overview" | "nodes" | "users" | "operations" = "nodes") {
-	detailNodeID.value = nodeId;
-	detailReturnView.value = from;
-	activeView.value = "node-detail";
+function applyRoute(route: DashboardRoute) {
+  activeView.value = route.view;
+  detailNodeID.value = route.view === "node-detail" ? route.nodeId : null;
+  if (route.view === "node-detail") detailReturnView.value = route.from;
+  if (route.view === "operations") operationsNodeFilter.value = route.nodeId ?? "";
+  mobileNavigationOpen.value = false;
+  quickSwitcherOpen.value = false;
+}
+
+function goToRoute(route: DashboardRoute) {
+  const hash = dashboardHash(route);
+  if (window.location.hash !== hash) window.history.pushState(null, "", hash);
+  applyRoute(route);
+}
+
+function syncRoute() {
+  const route = parseDashboardHash(window.location.hash);
+  const hash = dashboardHash(route);
+  if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
+  applyRoute(route);
+}
+
+function openNode(nodeId: string, from: PageView = "nodes") {
+  goToRoute({ view: "node-detail", nodeId, from });
+}
+
+function returnFromNode() {
+  if (detailReturnView.value === "operations") openOperations(detailNodeID.value ?? "");
+  else navigate(detailReturnView.value);
 }
 
 function openOperations(nodeId = "") {
-	operationsNodeFilter.value = nodeId;
-	activeView.value = "operations";
+  goToRoute({ view: "operations", nodeId });
 }
 
 function blurActiveElement() {
@@ -278,7 +299,7 @@ function openAlerts() {
 	void loadAlerts();
 }
 
-function navigate(view: "overview" | "nodes" | "users" | "exits" | "subscriptions" | "reports" | "notifications" | "operations") {
+function navigate(view: PageView) {
 	if (mobileNavigationOpen.value) {
 		blurActiveElement();
 	}
@@ -287,7 +308,24 @@ function navigate(view: "overview" | "nodes" | "users" | "exits" | "subscription
 		openOperations();
 		return;
 	}
-	activeView.value = view;
+	goToRoute({ view });
+}
+
+function openQuickSwitcher() {
+  blurActiveElement();
+  quickSwitcherOpen.value = true;
+}
+
+function openQuickNode(nodeId: string) {
+  openNode(nodeId, activeView.value === "node-detail" ? detailReturnView.value : activeView.value);
+}
+
+function handleShortcut(event: KeyboardEvent) {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k" || event.altKey || event.repeat || event.isComposing || event.defaultPrevented) return;
+  if (!quickSwitcherOpen.value && [...document.querySelectorAll<HTMLElement>(".n-modal, .n-drawer")].some((element) => element.getClientRects().length)) return;
+  event.preventDefault();
+  if (quickSwitcherOpen.value) quickSwitcherOpen.value = false;
+  else openQuickSwitcher();
 }
 
 async function loadOverviewOperations() {
@@ -383,8 +421,7 @@ async function saveNode(input: Required<NodeInput>) {
 async function finishArchive(node: NodeRecord, force = false) {
   await api.archiveNode(node.id, force);
   if (detailNodeID.value === node.id) {
-    detailNodeID.value = null;
-    activeView.value = "nodes";
+    navigate("nodes");
   }
   await loadNodes(true);
   message.success(force ? "节点已强制归档" : "节点已归档");
@@ -445,6 +482,9 @@ function handleAction(action: "edit" | "enroll" | "archive", node: NodeRecord) {
 let refreshTimer: number | undefined;
 let clockTimer: number | undefined;
 onMounted(() => {
+  syncRoute();
+  window.addEventListener("hashchange", syncRoute);
+  window.addEventListener("keydown", handleShortcut);
   updateClock();
   loadNodes();
   loadAlerts(true);
@@ -457,6 +497,8 @@ onMounted(() => {
   }, 15_000);
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("hashchange", syncRoute);
+  window.removeEventListener("keydown", handleShortcut);
   window.clearInterval(refreshTimer);
   window.clearInterval(clockTimer);
 });
@@ -500,6 +542,9 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="console-header__actions">
+            <n-tooltip trigger="hover" :disabled="quickSwitcherOpen"><template #trigger>
+              <n-button quaternary circle aria-label="快速跳转" @click="openQuickSwitcher"><template #icon><n-icon><search /></n-icon></template></n-button>
+            </template>快速跳转 · Ctrl / ⌘ K</n-tooltip>
             <span class="console-header__live" :class="{ 'is-warning': issues > 0 }">
               <i />
               <span>{{ headerStatus }}</span>
@@ -624,6 +669,19 @@ onBeforeUnmount(() => {
             </section>
           </main>
 
+          <assets-dashboard
+            v-else-if="activeView === 'assets'"
+            :nodes="nodes"
+            :assets="assetByNode"
+            :loading="loading"
+            :refreshing="refreshing"
+            :error="loadError"
+            @refresh="loadNodes()"
+            @create="openCreate"
+            @select="openNode($event.id, 'assets')"
+            @edit-asset="openAsset"
+          />
+
           <user-dashboard
             v-else-if="activeView === 'users'"
             :nodes="nodes"
@@ -663,14 +721,24 @@ onBeforeUnmount(() => {
 
           <node-detail-page
             v-else-if="activeView === 'node-detail' && detailNode"
+            :key="detailNode.id"
             :node="detailNode"
-            @back="activeView = detailReturnView"
+            @back="returnFromNode"
             @edit="openEdit"
             @enroll="enrollmentNode = $event"
             @operations="openOperations"
             @changed="loadNodes(true)"
             @session-expired="emit('session-expired')"
           />
+          <main v-else-if="activeView === 'node-detail'" class="workspace">
+            <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
+            <div v-else class="surface-state surface-state--empty">
+              <server :size="28" aria-hidden="true" />
+              <strong>{{ loadError || '找不到该节点，可能已归档或链接已失效' }}</strong>
+              <n-button v-if="loadError" secondary @click="loadNodes()">重新加载</n-button>
+              <n-button @click="navigate('nodes')">返回节点目录</n-button>
+            </div>
+          </main>
         </n-layout-content>
       </n-layout>
     </n-layout>
@@ -694,6 +762,8 @@ onBeforeUnmount(() => {
         />
       </n-drawer-content>
     </n-drawer>
+
+    <quick-switcher v-model:show="quickSwitcherOpen" :nodes="nodes" :loading="loading" :error="loadError" @navigate="navigate" @select-node="openQuickNode" />
 
     <node-form-modal
       v-model:show="formOpen"
