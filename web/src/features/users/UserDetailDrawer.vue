@@ -28,6 +28,7 @@ import {
   NTooltip,
 } from "naive-ui";
 import { adapterLabels, formatBytes, formatDateTime, progressStatus, quotaPercent, relativeTime } from "../../lib/format";
+import IconAction from "../../components/IconAction.vue";
 import type { NodeRecord, SubscriptionTokenRecord, UserAssignment, UserRecord } from "../../types";
 
 const props = defineProps<{
@@ -213,31 +214,17 @@ function formatLabel(format: string) {
     @keydown="handlePanelKeydown"
   >
     <header class="user-detail-shell__header user-detail-panel__header">
-      <n-tooltip trigger="hover">
-        <template #trigger>
-          <n-button
-            quaternary
-            circle
+      <icon-action
             class="user-detail-panel__back"
-            aria-label="返回用户列表"
+            label="返回用户列表"
             @click="emit('update:show', false)"
-          >
-            <template #icon><n-icon><arrow-left /></n-icon></template>
-          </n-button>
-        </template>
-        返回用户列表
-      </n-tooltip>
+          ><n-icon><arrow-left /></n-icon></icon-action>
       <div class="user-detail-header">
         <div>
           <h2 :id="`user-detail-${user.id}-title`">{{ user.display_name || user.username }}</h2>
           <span class="mono">@{{ user.username }}</span>
         </div>
-        <span
-          class="status-marker"
-          :class="`status-marker--${user.status === 'expired' ? 'expired' : user.enabled ? 'active' : 'disabled'}`"
-        >
-          <i aria-hidden="true" />{{ user.status === "expired" ? "已到期" : user.enabled ? "启用" : "已停用" }}
-        </span>
+        <span class="user-toggle-label">{{ user.status === "expired" ? "已到期" : user.enabled ? "启用" : "已停用" }}</span>
         <n-switch
           :value="user.enabled"
           :loading="working === `user:${user.id}`"
@@ -309,35 +296,17 @@ function formatLabel(format: string) {
             <footer>
               <span>{{ formatDateTime(token.created_at, false) }}</span>
               <div class="assignment-actions">
-                <n-tooltip v-if="token.status === 'active'" trigger="hover">
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
+                <icon-action v-if="token.status === 'active'"
                       :loading="working === `subscription-rotate:${token.id}`"
-                      :aria-label="`轮换 ${token.name} Token`"
+                      :label="`轮换 ${token.name} Token`"
                       @click="emit('rotate-subscription', user, token)"
-                    >
-                      <template #icon><n-icon><rotate-cw /></n-icon></template>
-                    </n-button>
-                  </template>
-                  轮换 Token
-                </n-tooltip>
-                <n-tooltip v-if="token.status === 'active'" trigger="hover">
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
-                      type="error"
+                    ><n-icon><rotate-cw /></n-icon></icon-action>
+                <icon-action v-if="token.status === 'active'"
+                      tone="danger"
                       :loading="working === `subscription-revoke:${token.id}`"
-                      :aria-label="`撤销 ${token.name} Token`"
+                      :label="`撤销 ${token.name} Token`"
                       @click="emit('revoke-subscription', user, token)"
-                    >
-                      <template #icon><n-icon><trash2 /></n-icon></template>
-                    </n-button>
-                  </template>
-                  撤销 Token
-                </n-tooltip>
+                    ><n-icon><trash2 /></n-icon></icon-action>
               </div>
             </footer>
           </article>
@@ -466,21 +435,11 @@ function formatLabel(format: string) {
               >
                 <template #suffix>GiB</template>
               </n-input-number>
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-button
-                    circle
-                    secondary
-                    size="small"
+              <icon-action
                     :loading="working === `limit:${assignment.id}`"
-                    :aria-label="`保存 ${assignment.node_name} 流量额度`"
+                    :label="`保存 ${assignment.node_name} 流量额度`"
                     @click="saveAssignmentLimit(assignment)"
-                  >
-                    <template #icon><n-icon><save /></n-icon></template>
-                  </n-button>
-                </template>
-                保存节点额度
-              </n-tooltip>
+                  ><n-icon><save /></n-icon></icon-action>
             </div>
             <footer>
               <span>
@@ -495,66 +454,27 @@ function formatLabel(format: string) {
                   :aria-label="`启用 ${assignment.node_name} 分配`"
                   @update:value="emit('toggle-assignment', user, assignment, $event)"
                 />
-                <n-tooltip
-                  v-if="assignment.management_mode === 'managed' && supportsKick(assignment)"
-                  trigger="hover"
-                >
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
+                <icon-action v-if="assignment.management_mode === 'managed' && supportsKick(assignment)"
                       :loading="working === `kick:${assignment.id}`"
-                      :aria-label="`将用户从 ${assignment.node_name} 踢下线`"
+                      :label="`将用户从 ${assignment.node_name} 踢下线`"
                       @click="emit('kick-assignment', user, assignment)"
-                    >
-                      <template #icon><n-icon><log-out /></n-icon></template>
-                    </n-button>
-                  </template>
-                  踢下线
-                </n-tooltip>
-                <n-tooltip v-if="assignment.management_mode === 'managed'" trigger="hover">
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
+                    ><n-icon><log-out /></n-icon></icon-action>
+                <icon-action v-if="assignment.management_mode === 'managed'"
                       :loading="working === `reveal:${assignment.id}`"
-                      :aria-label="`查看 ${assignment.node_name} 凭据`"
+                      :label="`查看 ${assignment.node_name} 凭据`"
                       @click="emit('reveal', user, assignment)"
-                    >
-                      <template #icon><n-icon><key-round /></n-icon></template>
-                    </n-button>
-                  </template>
-                  查看凭据
-                </n-tooltip>
-                <n-tooltip v-if="assignment.management_mode === 'managed'" trigger="hover">
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
+                    ><n-icon><key-round /></n-icon></icon-action>
+                <icon-action v-if="assignment.management_mode === 'managed'"
                       :disabled="assignment.state !== 'applied' || assignment.applied_version < assignment.desired_version"
                       :loading="working === `credential-rotate:${assignment.id}`"
-                      :aria-label="`轮换 ${assignment.node_name} 凭据`"
+                      :label="`轮换 ${assignment.node_name} 凭据`"
                       @click="emit('rotate-assignment-credential', user, assignment)"
-                    >
-                      <template #icon><n-icon><rotate-cw /></n-icon></template>
-                    </n-button>
-                  </template>
-                  轮换凭据
-                </n-tooltip>
-                <n-tooltip trigger="hover">
-                  <template #trigger>
-                    <n-button
-                      circle
-                      quaternary
-                      type="error"
-                      :aria-label="`取消 ${assignment.node_name} 分配`"
+                    ><n-icon><rotate-cw /></n-icon></icon-action>
+                <icon-action
+                      tone="danger"
+                      :label="`取消 ${assignment.node_name} 分配`"
                       @click="emit('unassign', user, assignment)"
-                    >
-                      <template #icon><n-icon><trash2 /></n-icon></template>
-                    </n-button>
-                  </template>
-                  取消分配
-                </n-tooltip>
+                    ><n-icon><trash2 /></n-icon></icon-action>
               </div>
             </footer>
           </article>

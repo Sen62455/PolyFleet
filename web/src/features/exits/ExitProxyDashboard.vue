@@ -7,6 +7,8 @@ import {
   Globe2,
   Link2,
   LockKeyhole,
+  BookOpen,
+  Pencil,
   Plus,
   RefreshCw,
   Server,
@@ -30,6 +32,7 @@ import {
   useMessage,
 } from "naive-ui";
 import StatCard from "../../components/StatCard.vue";
+import IconAction from "../../components/IconAction.vue";
 import { api, APIError } from "../../api";
 import type {
   ExitProxyInput,
@@ -334,9 +337,9 @@ onMounted(() => load());
           </dl>
           <p v-if="item.notes" class="egress-card__notes">{{ item.notes }}</p>
           <footer class="egress-card__actions">
-            <n-button size="small" secondary @click="openEdit(item)">编辑</n-button>
-            <n-button v-if="item.kind === 'landing_vps'" size="small" secondary @click="openGuide(item)">落地机指引</n-button>
-            <n-button size="small" quaternary class="egress-card__delete" aria-label="删除出口代理" @click="remove(item)"><template #icon><n-icon><trash-2 /></n-icon></template></n-button>
+            <icon-action label="编辑出口" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action>
+            <icon-action v-if="item.kind === 'landing_vps'" label="落地机指引" @click="openGuide(item)"><n-icon><book-open /></n-icon></icon-action>
+            <icon-action label="删除出口代理" tone="danger" @click="remove(item)"><n-icon><trash-2 /></n-icon></icon-action>
           </footer>
         </article>
         <button type="button" class="rack-add" @click="openCreate"><plus :size="20" /><span>添加出口</span></button>

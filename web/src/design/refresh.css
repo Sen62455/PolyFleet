@@ -977,3 +977,16 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
   .subscription-ledger > .ops-toolbar { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .console-content .operations-table-surface > .operations-filters .n-select { width: 100%; min-width: 0; flex: 1 1 100%; }
 }
+
+/* Round 2: shared inline actions, including keyboard tooltips. */
+.icon-action-wrap { display: inline-flex; flex: 0 0 auto; }
+.n-button.icon-action { width: 32px; height: 32px; padding: 0; }
+.n-button.icon-action:not(.n-button--disabled) { color: var(--hf-muted); }
+.n-button.icon-action:not(.n-button--disabled):hover { color: var(--hf-ink); background: var(--hf-hover); }
+.n-button.icon-action--danger:not(.n-button--disabled):hover,
+.n-button.icon-action--danger:not(.n-button--disabled):focus-visible { color: var(--hf-critical-deep); background: var(--hf-critical-soft); }
+.n-button.icon-action:focus-visible { outline: 3px solid var(--hf-accent); outline-offset: 2px; }
+.toggle-label { display: inline-flex; align-items: center; gap: 8px; color: var(--hf-muted); font-size: var(--fs-xs); }
+.user-detail-header .user-toggle-label { flex: 0 0 auto; color: var(--hf-muted); font-size: var(--fs-xs); }
+.notification-workspace :is(.notifier-surface, .reminder-surface, .bot-surface, .delivery-surface) > header { border-bottom-color: color-mix(in srgb, var(--hf-line) 50%, transparent); }
+.notification-workspace :is(.notifier-list, .reminder-list, .bot-list) article:hover { background: var(--hf-hover); }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { CalendarClock, Gauge, KeyRound, RefreshCw, Search as SearchIcon, ShieldOff, UsersRound } from "@lucide/vue";
+import { CalendarClock, Gauge, KeyRound, Pencil, RefreshCw, Search as SearchIcon, ShieldOff, UsersRound } from "@lucide/vue";
 import {
   NButton,
   NDatePicker,
@@ -15,6 +15,7 @@ import {
   useDialog,
   useMessage,
 } from "naive-ui";
+import IconAction from "../../components/IconAction.vue";
 import { api, APIError } from "../../api";
 import StatCard from "../../components/StatCard.vue";
 import { formatBytes, percent, relativeTime, severity } from "../../lib/format";
@@ -166,10 +167,7 @@ onMounted(() => load());
   <main class="workspace operations-workspace subscription-workspace">
     <div class="page-heading page-heading--console">
       <div><h2>订阅运营</h2><p>额度、有效期和最近使用集中在一张运营总账中</p></div>
-      <n-tooltip trigger="hover">
-        <template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新订阅" @click="load()"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>
-        刷新
-      </n-tooltip>
+      <icon-action :loading="refreshing" label="刷新订阅" @click="load()"><n-icon><refresh-cw /></n-icon></icon-action>
     </div>
 
     <section class="stat-grid" aria-label="订阅摘要">
@@ -221,7 +219,7 @@ onMounted(() => load());
               <td><strong>{{ expiry(item) }}</strong><small>Token / 用户取较早值</small></td>
               <td><strong>{{ relativeTime(item.last_used_at || item.last_traffic_at) }}</strong><small>{{ item.last_used_at ? "订阅已拉取" : "尚未拉取" }}</small></td>
               <td class="num"><strong class="node-count"><i :class="{ 'is-online': item.online_nodes > 0 }" />{{ Math.min(item.online_nodes, item.assignment_count) }} <span>/ {{ item.assignment_count }}</span></strong><small>用户在线 / 已分配</small></td>
-              <td class="ops-table__actions"><n-button size="small" secondary :disabled="item.status === 'revoked'" @click="openEdit(item)">调整</n-button><n-tooltip trigger="hover"><template #trigger><n-button quaternary circle type="error" :disabled="item.status === 'revoked'" aria-label="吊销订阅" @click="revoke(item)"><template #icon><n-icon><shield-off /></n-icon></template></n-button></template>吊销</n-tooltip></td>
+              <td class="ops-table__actions"><icon-action label="调整订阅" :disabled="item.status === 'revoked'" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action><icon-action tone="danger" :disabled="item.status === 'revoked'" label="吊销订阅" @click="revoke(item)"><n-icon><shield-off /></n-icon></icon-action></td>
             </tr>
           </tbody>
         </table>

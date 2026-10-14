@@ -13,6 +13,7 @@ import {
   NTooltip,
   useMessage,
 } from "naive-ui";
+import IconAction from "../../components/IconAction.vue";
 import { api, APIError } from "../../api";
 import StatCard from "../../components/StatCard.vue";
 import { formatDateTime } from "../../lib/format";
@@ -150,14 +151,7 @@ onMounted(() => void load());
   <main class="workspace operations-workspace operations-log-workspace">
     <div class="page-heading">
       <div><h2>操作记录</h2><p>节点运维任务与执行结果</p></div>
-      <n-tooltip trigger="hover">
-        <template #trigger>
-          <n-button circle secondary aria-label="刷新操作记录" :loading="refreshing" @click="load(true)">
-            <template #icon><n-icon><refresh-cw /></n-icon></template>
-          </n-button>
-        </template>
-        刷新
-      </n-tooltip>
+      <icon-action label="刷新操作记录" :loading="refreshing" @click="load(true)"><n-icon><refresh-cw /></n-icon></icon-action>
     </div>
 
     <section class="stat-grid" aria-label="当前页操作摘要">
@@ -216,20 +210,8 @@ onMounted(() => void load());
               <td>{{ operation.requested_by || "-" }}</td>
               <td>
                 <div class="row-actions">
-                  <n-tooltip v-if="operation.status === 'failed' || operation.status === 'expired'" trigger="hover">
-                    <template #trigger>
-                      <n-button circle quaternary size="small" aria-label="重试操作" :loading="retrying === operation.id" @click="retry(operation)">
-                        <template #icon><n-icon><rotate-ccw /></n-icon></template>
-                      </n-button>
-                    </template>重试
-                  </n-tooltip>
-                  <n-tooltip trigger="hover">
-                    <template #trigger>
-                      <n-button circle quaternary size="small" aria-label="查看操作详情" @click="selected = operation">
-                        <template #icon><n-icon><eye /></n-icon></template>
-                      </n-button>
-                    </template>详情
-                  </n-tooltip>
+                  <icon-action v-if="operation.status === 'failed' || operation.status === 'expired'" label="重试操作" :loading="retrying === operation.id" @click="retry(operation)"><n-icon><rotate-ccw /></n-icon></icon-action>
+                  <icon-action label="查看操作详情" @click="selected = operation"><n-icon><eye /></n-icon></icon-action>
                 </div>
               </td>
             </tr>

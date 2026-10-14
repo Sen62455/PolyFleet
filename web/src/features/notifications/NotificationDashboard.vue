@@ -18,6 +18,7 @@ import {
   useDialog,
   useMessage,
 } from "naive-ui";
+import IconAction from "../../components/IconAction.vue";
 import { api, APIError } from "../../api";
 import StatCard from "../../components/StatCard.vue";
 import { relativeTime } from "../../lib/format";
@@ -344,6 +345,20 @@ async function test(item: NotificationNotifierRecord) {
   }
 }
 
+async function setNotifierEnabled(item: NotificationNotifierRecord, value: boolean) {
+  if (working.value) return;
+  working.value = `notifier:${item.id}`;
+  try {
+    await api.saveNotificationNotifier({ id: item.id, name: item.name, kind: item.kind, enabled: value, events: item.events });
+    await load();
+    message.success(value ? "通知通道已启用" : "通知通道已停用");
+  } catch (error) {
+    handleError(error, "通知通道状态保存失败。");
+  } finally {
+    working.value = "";
+  }
+}
+
 function remove(item: NotificationNotifierRecord) {
   dialog.warning({
     title: "删除通知通道",
@@ -404,7 +419,7 @@ onMounted(() => load());
   <main class="workspace operations-workspace notification-workspace">
     <div class="page-heading page-heading--console">
       <div><h2>告警通知</h2><p>告警创建与恢复会进入持久化队列，失败按退避策略重试</p></div>
-      <div class="page-heading__actions"><n-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新通知" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</n-tooltip><n-button type="primary" @click="openCreate"><template #icon><n-icon><plus /></n-icon></template>添加通道</n-button></div>
+      <div class="page-heading__actions"><icon-action :loading="refreshing" label="刷新通知" @click="load"><n-icon><refresh-cw /></n-icon></icon-action><n-button type="primary" @click="openCreate"><template #icon><n-icon><plus /></n-icon></template>添加通道</n-button></div>
     </div>
 
     <section class="stat-grid" aria-label="通知摘要">
@@ -439,8 +454,8 @@ onMounted(() => load());
           <article v-for="item in settings.notifiers" :key="item.id">
             <div class="notifier-list__icon"><bell-ring :size="18" /></div>
             <div class="notifier-list__identity"><strong>{{ item.name }}</strong><small>{{ kindLabel(item.kind) }} · {{ item.target_hint }} · {{ item.events.map((event) => event === 'created' ? '创建' : '恢复').join(' / ') }}</small></div>
-            <span class="pill" :class="item.enabled ? 'pill--signal' : 'pill--neutral'">{{ item.enabled ? '启用' : '停用' }}</span>
-            <div class="notifier-list__actions"><n-button size="small" secondary @click="openEdit(item)">编辑</n-button><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary :loading="working === `test:${item.id}`" aria-label="测试通知" @click="test(item)"><template #icon><n-icon><flask-conical /></n-icon></template></n-button></template>发送测试</n-tooltip><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary type="error" aria-label="删除通道" @click="remove(item)"><template #icon><n-icon><trash2 /></n-icon></template></n-button></template>删除</n-tooltip></div>
+            <label class="toggle-label"><span>{{ item.enabled ? '启用' : '已停用' }}</span><n-switch :value="item.enabled" size="small" :loading="working === `notifier:${item.id}`" :disabled="!!working" :aria-label="`启用 ${item.name} 通道`" @update:value="setNotifierEnabled(item, $event)" /></label>
+            <div class="notifier-list__actions"><icon-action label="编辑通道" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action><icon-action :loading="working === `test:${item.id}`" label="测试通知" @click="test(item)"><n-icon><flask-conical /></n-icon></icon-action><icon-action tone="danger" label="删除通道" @click="remove(item)"><n-icon><trash2 /></n-icon></icon-action></div>
           </article>
         </div>
       </section>
@@ -456,8 +471,8 @@ onMounted(() => load());
             <div class="reminder-list__icon"><calendar-clock v-if="rule.kind === 'asset_expiry'" :size="18" /><gauge v-else-if="rule.kind === 'traffic_usage'" :size="18" /><alarm-clock v-else :size="18" /></div>
             <div class="reminder-list__identity"><strong>{{ rule.name }}</strong><small>{{ reminderKindLabel(rule.kind) }} · {{ reminderScope(rule) }} · {{ rule.notifier_name }}</small><em :class="{ 'is-error': rule.last_error }">{{ rule.last_error || rule.last_result || '尚未执行' }}</em></div>
             <div class="reminder-list__schedule"><span>{{ intervalLabel(rule.interval_minutes) }}</span><small>下次 {{ timeUntil(rule.next_run_at) }}</small></div>
-            <n-switch :value="rule.enabled" size="small" :loading="working === `toggle:${rule.id}`" @update:value="setReminderEnabled(rule, $event)" />
-            <div class="notifier-list__actions"><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary :loading="working === `rule:${rule.id}`" aria-label="立即执行提醒" @click="runReminder(rule)"><template #icon><n-icon><play /></n-icon></template></n-button></template>立即执行</n-tooltip><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary aria-label="编辑提醒" @click="openReminderEdit(rule)"><template #icon><n-icon><pencil /></n-icon></template></n-button></template>编辑</n-tooltip><n-tooltip trigger="hover"><template #trigger><n-button circle quaternary type="error" aria-label="删除提醒" @click="removeReminder(rule)"><template #icon><n-icon><trash2 /></n-icon></template></n-button></template>删除</n-tooltip></div>
+            <n-switch :value="rule.enabled" size="small" :loading="working === `toggle:${rule.id}`" :aria-label="`启用 ${rule.name} 提醒`" @update:value="setReminderEnabled(rule, $event)" />
+            <div class="notifier-list__actions"><icon-action :loading="working === `rule:${rule.id}`" label="立即执行提醒" @click="runReminder(rule)"><n-icon><play /></n-icon></icon-action><icon-action label="编辑提醒" @click="openReminderEdit(rule)"><n-icon><pencil /></n-icon></icon-action><icon-action tone="danger" label="删除提醒" @click="removeReminder(rule)"><n-icon><trash2 /></n-icon></icon-action></div>
           </article>
         </div>
       </section>
@@ -469,7 +484,7 @@ onMounted(() => load());
           <article v-for="item in settings.notifiers.filter((entry) => entry.kind === 'telegram')" :key="item.id">
             <div class="notifier-list__icon"><bot :size="18" /></div>
             <div><strong>{{ item.name }}</strong><small>/status · /nodes · /node 节点名 · 直接发送节点名</small><em v-if="telegramBotFor(item.id)?.last_error" class="is-error">{{ telegramBotFor(item.id)?.last_error }}</em><em v-else>{{ telegramBotFor(item.id)?.last_poll_at ? `最近轮询 ${relativeTime(telegramBotFor(item.id)?.last_poll_at ?? null)}` : '启用后每 15 秒检查新消息' }}</em></div>
-            <n-switch :value="telegramBotFor(item.id)?.enabled ?? false" :loading="working === `bot:${item.id}`" :disabled="!item.enabled" @update:value="toggleTelegramBot(item.id, $event)" />
+            <n-switch :value="telegramBotFor(item.id)?.enabled ?? false" :loading="working === `bot:${item.id}`" :disabled="!item.enabled" :aria-label="`启用 ${item.name} Bot 查询`" @update:value="toggleTelegramBot(item.id, $event)" />
           </article>
         </div>
       </section>
