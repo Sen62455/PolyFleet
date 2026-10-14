@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import { ArrowDown, ArrowUp, BarChart3, ChevronDown, Download, RefreshCw, Server, TrendingDown, TrendingUp, UsersRound, Zap } from "@lucide/vue";
 import { NAlert, NButton, NDropdown, NIcon, NSpin, NTooltip, useMessage } from "naive-ui";
@@ -84,10 +85,10 @@ onMounted(() => load());
       </div>
     </div>
 
-    <n-alert v-if="loadError" type="error" :show-icon="false"><div class="alert-row"><span>{{ loadError }}</span><n-button text type="error" @click="load">重新加载</n-button></div></n-alert>
-    <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
+    <surface-state v-if="loading" kind="loading" stats />
 <template v-else-if="report">
-  <section class="stat-grid" aria-label="流量摘要">
+  <section v-if="!loading" class="stat-grid" aria-label="流量摘要">
     <stat-card label="双向总量">
       <template #icon><bar-chart3 :size="18" /></template>
       {{ formatBytes(report.total_bytes) }}
@@ -145,7 +146,7 @@ onMounted(() => load());
           <i class="rank-bar" aria-hidden="true"><b :style="{ width: barWidth(item.total_bytes, report.top_users) }" /></i>
         </li>
       </ol>
-      <div v-else class="rank-empty">暂无可归属用户流量</div>
+      <surface-state v-else kind="empty" title="暂无可归属用户流量" hint="节点上报可归属的流量后显示排行" action-label="刷新报表" @action="load()" />
     </section>
     <section class="rank-surface">
       <header><span class="rank-icon"><server :size="16" /></span><h3>节点用量排行</h3></header>
@@ -160,7 +161,7 @@ onMounted(() => load());
           <i class="rank-bar" aria-hidden="true"><b :style="{ width: barWidth(item.total_bytes, report.top_nodes) }" /></i>
         </li>
       </ol>
-      <div v-else class="rank-empty">暂无节点流量批次</div>
+      <surface-state v-else kind="empty" title="暂无节点流量批次" hint="节点上报流量后显示排行" action-label="刷新报表" @action="load()" />
     </section>
   </div>
 </template>

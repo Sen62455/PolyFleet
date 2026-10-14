@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Ban, Gauge, Wifi, Plus, RefreshCw, Search, UsersRound } from "@lucide/vue";
 import { NAlert, NButton, NIcon, NInput, NSpin, NTooltip, useDialog, useMessage } from "naive-ui";
@@ -580,7 +581,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <section class="stat-grid" aria-label="用户摘要">
+    <section v-if="!loading" class="stat-grid" aria-label="用户摘要">
   <stat-card label="全部用户" :muted="totalUsers === 0">
     <template #icon><users-round :size="18" /></template>{{ totalUsers }}
   </stat-card>
@@ -595,12 +596,7 @@ onBeforeUnmount(() => {
   </stat-card>
 </section>
 
-    <n-alert v-if="loadError" type="error" :show-icon="false" class="workspace-alert">
-      <div class="alert-row">
-        <span>{{ loadError }}</span>
-        <n-button text type="error" @click="loadUsers()">重新加载</n-button>
-      </div>
-    </n-alert>
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="loadUsers()" />
 
       <section class="node-surface users-surface" aria-label="用户列表">
         <header v-if="!loading && users.length" class="user-ledger-toolbar" aria-label="筛选用户">
@@ -627,8 +623,8 @@ onBeforeUnmount(() => {
           </div>
           <span class="user-filter-result">本页 {{ filteredUsers.length }} / {{ users.length }} · 共 {{ totalUsers }}</span>
         </header>
-        <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
-        <div v-else-if="users.length === 0" class="surface-state surface-state--empty">
+        <surface-state v-if="loading" kind="loading" stats />
+        <div v-else-if="users.length === 0 && !loadError" class="surface-state surface-state--empty">
           <users-round :size="28" :stroke-width="1.7" aria-hidden="true" />
           <strong>尚未添加用户</strong>
           <n-button type="primary" size="small" @click="openCreate">
@@ -636,8 +632,8 @@ onBeforeUnmount(() => {
             添加用户
           </n-button>
         </div>
-        <div v-else-if="filteredUsers.length === 0" class="surface-state surface-state--empty surface-state--filtered">
-          <strong>没有符合条件的用户</strong>
+        <div v-else-if="filteredUsers.length === 0 && !loadError" class="surface-state surface-state--empty surface-state--filtered">
+          <search :size="26" aria-hidden="true" /><strong>没有符合条件的用户</strong>
           <n-button secondary size="small" @click="resetUserFilters">清除筛选</n-button>
         </div>
         <user-table

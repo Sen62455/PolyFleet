@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import {
   Cable,
@@ -50,6 +51,7 @@ const proxies = ref<ExitProxyRecord[]>([]);
 const nodes = ref<NodeRecord[]>([]);
 const loading = ref(true);
 const refreshing = ref(false);
+const loadError = ref("");
 const saving = ref(false);
 const modalOpen = ref(false);
 const editingID = ref("");
@@ -100,12 +102,14 @@ async function load(silent = false) {
   if (refreshing.value) return;
   if (!silent) loading.value = proxies.value.length === 0;
   refreshing.value = true;
+  loadError.value = "";
   try {
     const [nextProxies, nextNodes] = await Promise.all([api.listExitProxies(), api.listNodes()]);
     proxies.value = nextProxies;
     nodes.value = nextNodes;
   } catch (error) {
-    handleError(error, "出口代理加载失败。");
+    loadError.value = error instanceof APIError ? error.message : "出口代理加载失败。";
+    if (error instanceof APIError && error.status === 401) emit("session-expired");
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -309,16 +313,17 @@ onMounted(() => load());
       </div>
     </div>
 
-    <section class="stat-grid" aria-label="出口摘要">
+    <section v-if="!loading" class="stat-grid" aria-label="出口摘要">
       <stat-card label="出口总数" :muted="!proxies.length"><template #icon><cable :size="18" /></template>{{ proxies.length }}<template #hint>未配置时节点保持直出</template></stat-card>
       <stat-card label="租用 IP" :muted="!rentedCount"><template #icon><globe-2 :size="18" /></template>{{ rentedCount }}<template #hint>服务商提供的 SOCKS5 / HTTP</template></stat-card>
       <stat-card label="落地 VPS" :muted="!landingCount"><template #icon><server :size="18" /></template>{{ landingCount }}<template #hint>可生成安装与防火墙指引</template></stat-card>
       <stat-card label="已挂入口" :muted="!attachedCount"><template #icon><link2 :size="18" /></template>{{ attachedCount }}<template #hint>客户端链式或入口服务器转发</template></stat-card>
     </section>
 
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
     <section class="exit-list" aria-label="出口列表">
-      <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
-      <div v-else-if="proxies.length === 0" class="surface-state surface-state--empty">
+      <surface-state v-if="loading" kind="loading" stats />
+      <div v-else-if="!proxies.length && !loadError" class="surface-state surface-state--empty">
         <cable :size="26" />
         <strong>尚未配置出口代理</strong>
         <p>通过租用 IP 或落地机出网，未配置时节点保持直出。</p>

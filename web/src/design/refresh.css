@@ -1053,3 +1053,14 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
 @media (min-width: 1280px) {
   .users-workspace--detail .user-table .user-nodes-column { display: none; }
 }
+
+/* R13: stable loading dimensions, useful empty states and persistent retries. */
+.surface-state { gap: 10px; padding: 28px 20px; text-align: center; }
+.surface-state small { max-width: 560px; color: var(--hf-muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.surface-state--error { min-height: 160px; border: 1px solid var(--hf-line); border-radius: var(--hf-radius-lg); background: var(--hf-surface); }
+.surface-state--error > svg { color: var(--hf-critical-deep); }
+.surface-state--loading { display: block; min-height: 264px; }
+.surface-state__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.surface-state__rows { display: grid; width: 100%; gap: 12px; }
+@media (max-width: 900px) { .surface-state__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .surface-state .n-skeleton { animation: none !important; } }

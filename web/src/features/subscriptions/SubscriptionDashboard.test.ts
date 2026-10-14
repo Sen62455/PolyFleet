@@ -50,6 +50,19 @@ afterEach(() => {
 });
 
 describe("SubscriptionDashboard", () => {
+  it("keeps a loading failure visible and lets the user retry", async () => {
+    const list = vi.spyOn(api, "listSubscriptionOperations").mockRejectedValueOnce(new Error("unavailable"))
+      .mockResolvedValue({ subscriptions: [subscription], total: 1, limit: 50, offset: 0 });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain("订阅运营数据加载失败");
+    await wrapper.get('[role="alert"] button').trigger("click");
+    await flushPromises();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Alice");
+    wrapper.unmount();
+  });
   it("renders quota evidence, filters server-side, and saves an extension", async () => {
     const list = vi.spyOn(api, "listSubscriptionOperations").mockResolvedValue({
       subscriptions: [subscription], total: 1, limit: 50, offset: 0,
@@ -72,7 +85,7 @@ describe("SubscriptionDashboard", () => {
     await flushPromises();
     expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "active", offset: 0 }));
 
-    const adjust = wrapper.findAll("button").find((button) => button.text().trim() === "调整");
+    const adjust = wrapper.find('button[aria-label="调整订阅"]');
     await adjust!.trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("调整订阅策略");

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   Bell,
@@ -626,16 +627,14 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <section class="fleet-summary" aria-label="节点摘要">
+            <section v-if="!loading" class="fleet-summary" aria-label="节点摘要">
               <div class="fleet-summary__item"><span>全部节点</span><strong>{{ nodes.length }}</strong></div>
               <div class="fleet-summary__item fleet-summary__item--healthy"><span>在线</span><strong>{{ onlineCount }}</strong></div>
               <div class="fleet-summary__item fleet-summary__item--warning"><span>待连接</span><strong>{{ pendingCount }}</strong></div>
               <div class="fleet-summary__item fleet-summary__item--danger"><span>需关注</span><strong>{{ issues }}</strong></div>
             </section>
 
-            <n-alert v-if="loadError" type="error" :show-icon="false" class="workspace-alert">
-              <div class="alert-row"><span>{{ loadError }}</span><n-button text type="error" @click="loadNodes()">重新加载</n-button></div>
-            </n-alert>
+            <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="loadNodes()" />
 
             <section v-if="selectedNodeIDs.length" class="bulk-commandbar" aria-label="批量节点操作">
               <strong>已选择 {{ selectedNodeIDs.length }} 台节点</strong>
@@ -645,8 +644,8 @@ onBeforeUnmount(() => {
             </section>
 
             <section class="node-surface" aria-label="节点列表">
-              <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
-              <div v-else-if="nodes.length === 0" class="surface-state surface-state--empty">
+              <surface-state v-if="loading" kind="loading" stats />
+              <div v-else-if="nodes.length === 0 && !loadError" class="surface-state surface-state--empty">
                 <server :size="28" :stroke-width="1.7" aria-hidden="true" />
                 <strong>尚未添加节点</strong>
                 <n-button type="primary" size="small" @click="openCreate">
@@ -727,7 +726,7 @@ onBeforeUnmount(() => {
             @session-expired="emit('session-expired')"
           />
           <main v-else-if="activeView === 'node-detail'" class="workspace">
-            <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
+            <surface-state v-if="loading" kind="loading" stats />
             <div v-else class="surface-state surface-state--empty">
               <server :size="28" aria-hidden="true" />
               <strong>{{ loadError || '找不到该节点，可能已归档或链接已失效' }}</strong>

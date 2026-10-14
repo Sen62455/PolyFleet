@@ -68,6 +68,21 @@ afterEach(() => {
 });
 
 describe("NotificationDashboard", () => {
+  it("toggles a channel without resubmitting or clearing its saved credentials", async () => {
+    vi.spyOn(api, "getNotificationSettings").mockResolvedValue(settings);
+    vi.spyOn(api, "listNodes").mockResolvedValue([]);
+    const save = vi.spyOn(api, "saveNotificationNotifier").mockResolvedValue(settings.notifiers[0]);
+    const host = defineComponent({
+      components: { NDialogProvider, NMessageProvider, NotificationDashboard },
+      template: '<n-dialog-provider><n-message-provider><notification-dashboard /></n-message-provider></n-dialog-provider>',
+    });
+    const wrapper = mount(host, { attachTo: document.body });
+    await flushPromises();
+    await wrapper.get('.notifier-list [role="switch"]').trigger("click");
+    await flushPromises();
+    expect(save).toHaveBeenCalledWith({ id: settings.notifiers[0].id, name: settings.notifiers[0].name, kind: settings.notifiers[0].kind, events: settings.notifiers[0].events, enabled: !settings.notifiers[0].enabled });
+    wrapper.unmount();
+  });
   it("shows delivery state and sends a channel test", async () => {
     vi.spyOn(api, "getNotificationSettings").mockResolvedValue(settings);
     vi.spyOn(api, "listNodes").mockResolvedValue([]);
@@ -112,7 +127,7 @@ describe("NotificationDashboard", () => {
     const wrapper = mount(host, { attachTo: document.body });
     await flushPromises();
 
-    const editButton = wrapper.findAll("button").find((button) => button.text() === "编辑");
+    const editButton = wrapper.find('button[aria-label="编辑通道"]');
     expect(editButton).toBeDefined();
     await editButton!.trigger("click");
     await flushPromises();

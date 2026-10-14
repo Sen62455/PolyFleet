@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import ErrorSummary from "../../components/ErrorSummary.vue";
 import StatusPill from "../../components/StatusPill.vue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -34,6 +35,7 @@ const total = ref(0);
 const loading = ref(true);
 const refreshing = ref(false);
 const loadError = ref("");
+let loadRequest = 0;
 const nodeFilter = ref(props.initialNodeId);
 const typeFilter = ref<NodeOperationType | "">("");
 const statusFilter = ref<NodeOperationStatus | "">("");
@@ -78,6 +80,7 @@ function readableError(error: unknown, fallback: string) {
 }
 
 async function load(silent = false) {
+  const request = ++loadRequest;
   if (!silent) loading.value = operations.value.length === 0;
   refreshing.value = true;
   loadError.value = "";
@@ -89,13 +92,13 @@ async function load(silent = false) {
       limit: pageSize.value,
       offset: (page.value - 1) * pageSize.value,
     });
+    if (request !== loadRequest) return;
     operations.value = result.operations;
     total.value = result.total;
   } catch (error) {
-    loadError.value = readableError(error, "操作记录加载失败。");
+    if (request === loadRequest) loadError.value = readableError(error, "操作记录加载失败。");
   } finally {
-    loading.value = false;
-    refreshing.value = false;
+    if (request === loadRequest) { loading.value = false; refreshing.value = false; }
   }
 }
 
@@ -155,7 +158,7 @@ onMounted(() => void load());
       <icon-action label="刷新操作记录" :loading="refreshing" @click="load(true)"><n-icon><refresh-cw /></n-icon></icon-action>
     </div>
 
-    <section class="stat-grid" aria-label="当前页操作摘要">
+    <section v-if="!loading" class="stat-grid" aria-label="当前页操作摘要">
       <stat-card label="执行中" :muted="!runningCount">
         <template #icon><activity :size="18" /></template>
         {{ runningCount }}
@@ -178,7 +181,7 @@ onMounted(() => void load());
       </stat-card>
     </section>
 
-    <div v-if="loadError" class="operations-page-error">{{ loadError }}</div>
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
     <section class="ops-surface operations-table-surface" aria-label="操作记录">
       <header class="operations-filters" aria-label="操作记录筛选">
         <n-select v-model:value="nodeFilter" :options="nodeOptions" :consistent-menu-width="false" aria-label="筛选节点" />
@@ -194,8 +197,8 @@ onMounted(() => void load());
           >{{ item.label }}</button>
         </div>
       </header>
-      <div v-if="loading" class="operations-page-state"><n-spin :size="26" /></div>
-      <div v-else-if="operations.length === 0" class="operations-page-state">没有匹配的操作记录</div>
+      <surface-state v-if="loading" kind="loading" stats />
+      <surface-state v-else-if="!operations.length && !loadError" kind="empty" title="没有匹配的操作记录" hint="调整筛选查看历史记录，或从节点详情发起运维操作。" action-label="重置并刷新" @action="nodeFilter = ''; typeFilter = ''; statusFilter = ''; page = 1; load()" />
       <div v-else class="operations-table-wrap">
         <table class="operations-table">
           <thead><tr><th>时间</th><th>节点</th><th>操作</th><th class="num">序号 / 尝试</th><th>状态</th><th class="num">耗时</th><th>结果摘要</th><th>操作人</th><th><span class="sr-only">操作</span></th></tr></thead>

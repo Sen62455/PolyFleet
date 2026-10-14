@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, ref, watch } from "vue";
 import {
   AlertTriangle,
@@ -260,7 +261,7 @@ function onCardDragEnd() {
 
 <template>
   <main class="workspace overview-workspace fleet-overview">
-<section class="stat-grid" aria-label="舰队运行总账">
+<section v-if="!loading" class="stat-grid" aria-label="舰队运行总账">
   <stat-card label="在线节点">
     <template #icon><server :size="18" /></template>
     {{ online }}<small>/ {{ nodes.length }}</small>
@@ -294,8 +295,8 @@ function onCardDragEnd() {
   </stat-card>
 </section>
 
-    <div v-if="error" class="overview-error"><span>{{ error }}</span><n-button text type="error" @click="emit('refresh')">重新加载</n-button></div>
-    <div v-if="loading" class="overview-loading"><n-spin :size="28" /></div>
+    <surface-state v-if="error" kind="error" :hint="error" :busy="loading" @action="emit('refresh')" />
+    <surface-state v-if="loading" kind="loading" stats />
 
     <template v-else>
       <section class="probe-rack" aria-label="节点机柜">
@@ -390,9 +391,9 @@ function onCardDragEnd() {
             </footer>
           </article>
         </div>
-        <div v-else class="overview-empty">
+        <div v-else-if="!error" class="overview-empty">
           <server :size="28" />
-          <strong>{{ nodes.length ? "没有匹配的节点" : "尚未添加节点" }}</strong>
+          <strong>{{ nodes.length ? "没有匹配的节点" : "尚未添加节点" }}</strong><small>{{ nodes.length ? '调整筛选查看其他节点' : '接入首台 VPS 后即可查看运行状况' }}</small><n-button v-if="nodes.length" secondary @click="nodeSearch = ''; nodeStatus = 'all'">清除筛选</n-button>
           <n-button v-if="!nodes.length" type="primary" size="small" @click="emit('create')">添加节点</n-button>
         </div>
       </section>

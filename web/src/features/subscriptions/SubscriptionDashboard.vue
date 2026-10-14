@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import { CalendarClock, Gauge, KeyRound, Pencil, RefreshCw, Search as SearchIcon, ShieldOff, UsersRound } from "@lucide/vue";
 import {
@@ -28,6 +29,8 @@ const subscriptions = ref<SubscriptionOperationRecord[]>([]);
 const total = ref(0);
 const loading = ref(true);
 const refreshing = ref(false);
+const loadError = ref("");
+let loadRequest = 0;
 const search = ref("");
 const status = ref<"current" | SubscriptionOperationStatus>("current");
 const offset = ref(0);
@@ -62,9 +65,10 @@ function handleError(error: unknown, fallback: string) {
 }
 
 async function load(silent = false) {
-  if (refreshing.value) return;
+  const request = ++loadRequest;
   if (!silent) loading.value = subscriptions.value.length === 0;
   refreshing.value = true;
+  loadError.value = "";
   try {
     const page = await api.listSubscriptionOperations({
       status: status.value,
@@ -72,13 +76,15 @@ async function load(silent = false) {
       limit: pageSize,
       offset: offset.value,
     });
+    if (request !== loadRequest) return;
     subscriptions.value = page.subscriptions;
     total.value = page.total;
   } catch (error) {
-    handleError(error, "订阅运营数据加载失败。");
+    if (request !== loadRequest) return;
+    loadError.value = error instanceof APIError ? error.message : "订阅运营数据加载失败。";
+    if (error instanceof APIError && error.status === 401) emit("session-expired");
   } finally {
-    loading.value = false;
-    refreshing.value = false;
+    if (request === loadRequest) { loading.value = false; refreshing.value = false; }
   }
 }
 
@@ -170,7 +176,7 @@ onMounted(() => load());
       <icon-action :loading="refreshing" label="刷新订阅" @click="load()"><n-icon><refresh-cw /></n-icon></icon-action>
     </div>
 
-    <section class="stat-grid" aria-label="订阅摘要">
+    <section v-if="!loading" class="stat-grid" aria-label="订阅摘要">
       <stat-card label="订阅总数">
         <template #icon><key-round :size="18" /></template>
         {{ total }}
@@ -193,17 +199,18 @@ onMounted(() => load());
       </stat-card>
     </section>
 
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
     <section class="ops-surface subscription-ledger" aria-label="订阅列表">
       <header class="ops-toolbar" aria-label="订阅筛选">
         <n-input v-model:value="search" clearable placeholder="搜索用户、订阅名或 Token 前缀" @keyup.enter="offset = 0; load()">
           <template #prefix><n-icon><search-icon :size="15" /></n-icon></template>
         </n-input>
-        <div class="ops-segments" role="tablist" aria-label="订阅状态">
-          <button v-for="item in filters" :key="item.value" type="button" :class="{ 'is-active': status === item.value }" @click="setFilter(item.value)">{{ item.label }}</button>
+        <div class="ops-segments" role="group" aria-label="订阅状态">
+          <button v-for="item in filters" :key="item.value" type="button" :class="{ 'is-active': status === item.value }" :aria-pressed="status === item.value" @click="setFilter(item.value)">{{ item.label }}</button>
         </div>
       </header>
-      <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
-      <div v-else-if="subscriptions.length === 0" class="surface-state surface-state--empty"><key-round :size="26" /><strong>没有符合条件的订阅</strong></div>
+      <surface-state v-if="loading" kind="loading" stats />
+      <surface-state v-else-if="!subscriptions.length && !loadError" kind="empty" title="没有符合条件的订阅" hint="可重置筛选；新订阅需在用户详情中创建。" action-label="重置并刷新" @action="search = ''; setFilter('current')" />
       <div v-else class="ops-table-wrap">
         <table class="ops-table subscription-table">
           <thead><tr><th>订阅 / 用户</th><th>状态</th><th>双向流量</th><th>有效期</th><th>最近活动</th><th class="num">节点</th><th><span class="sr-only">操作</span></th></tr></thead>

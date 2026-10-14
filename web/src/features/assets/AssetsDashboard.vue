@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ArrowUpRight, CalendarClock, ChevronDown, CircleAlert, Download, FileQuestion, Package, RefreshCw, Search, Server } from "@lucide/vue";
 import { NAlert, NButton, NDropdown, NIcon, NInput, NPagination, NSelect, NSpin, NTooltip, useMessage } from "naive-ui";
@@ -97,10 +98,10 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
       </div>
     </div>
 
-    <n-alert v-if="error" type="error" :show-icon="false"><div class="alert-row"><span>{{ error }}</span><n-button text type="error" @click="emit('refresh')">重新加载</n-button></div></n-alert>
-    <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
+    <surface-state v-if="error" kind="error" :hint="error" :busy="refreshing" @action="emit('refresh')" />
+    <surface-state v-if="loading" kind="loading" stats />
     <template v-else>
-      <section class="stat-grid" aria-label="资产摘要">
+      <section v-if="!loading" class="stat-grid" aria-label="资产摘要">
         <stat-card label="全部资产" clickable :aria-pressed="filter === 'all'" @click="selectFilter('all')">
           <template #icon><package :size="18" /></template>{{ rows.length }}<template #hint>已接入的 VPS 节点</template>
         </stat-card>
@@ -128,7 +129,7 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
         <div v-if="!rows.length && !error" class="surface-state surface-state--empty">
           <server :size="28" aria-hidden="true" /><strong>添加节点后即可管理资产档案</strong><n-button type="primary" @click="emit('create')">添加节点</n-button>
         </div>
-        <div v-else-if="!filteredRows.length" class="surface-state surface-state--empty">
+        <div v-else-if="!filteredRows.length && !error" class="surface-state surface-state--empty">
           <search :size="28" aria-hidden="true" /><strong>{{ error ? '资产暂时不可用' : '没有匹配的资产' }}</strong>
           <n-button v-if="!error" secondary @click="selectFilter('all')">清除筛选</n-button>
         </div>

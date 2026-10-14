@@ -49,7 +49,7 @@ describe("TrafficReportsDashboard", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("100 GiB");
-    expect(wrapper.text()).toContain("较上期 +100.0%");
+    expect(wrapper.text().replace(/\s+/g, " ")).toContain("较上期 +100.0%");
     expect(wrapper.text()).toContain("Alice");
     expect(wrapper.text()).toContain("dmit2-reality");
     expect(wrapper.find('[role="img"][aria-label="每日上下行流量趋势"]').exists()).toBe(true);

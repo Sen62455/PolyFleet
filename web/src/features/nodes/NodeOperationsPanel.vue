@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import ErrorSummary from "../../components/ErrorSummary.vue";
 import { isHistoricalFailure } from "../../lib/format";
 import StatusPill from "../../components/StatusPill.vue";
@@ -332,8 +333,8 @@ watch(
       <small>固定发送 4 个 ICMP 请求，每次等待不超过 2 秒；请输入要测量的目标 IP。</small>
     </div>
 
-    <div v-if="loading" class="operations-state"><n-spin :size="22" /></div>
-    <div v-else-if="loadError" class="operations-state operations-state--error">{{ loadError }}</div>
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
+    <surface-state v-if="loading" kind="loading" />
     <div v-else-if="operations.length" class="operation-list">
       <article v-for="operation in operations" :key="operation.id" class="operation-item">
         <header>
@@ -368,7 +369,7 @@ watch(
         <pre v-if="operation.output && !compact && !isHistoricalFailure(operation.status, operation.completed_at || operation.created_at)" class="operation-output">{{ operation.output }}</pre>
       </article>
     </div>
-    <div v-else class="operations-state">尚无运维操作</div>
+    <surface-state v-else-if="!loadError" kind="empty" title="尚无运维操作" hint="可从上方选择操作，结果将在这里显示" action-label="刷新记录" @action="load()" />
 
     <div v-if="backups.length && !compact" class="backup-list">
       <h3>节点本地备份</h3>

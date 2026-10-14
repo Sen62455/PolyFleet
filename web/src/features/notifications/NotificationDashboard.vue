@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import { AlarmClock, BellRing, Bot, CalendarClock, CheckCircle2, FlaskConical, Gauge, Pencil, Play, Plus, RefreshCw, Send, Trash2, Webhook } from "@lucide/vue";
 import {
@@ -31,6 +32,8 @@ const settings = ref<NotificationSettings>({ notifiers: [], deliveries: [], remi
 const nodes = ref<NodeRecord[]>([]);
 const loading = ref(true);
 const refreshing = ref(false);
+const loadError = ref("");
+const loaded = ref(false);
 const working = ref("");
 const modalOpen = ref(false);
 const saving = ref(false);
@@ -135,13 +138,16 @@ async function copyTelegramUpdatesURL() {
 async function load() {
   if (refreshing.value) return;
   refreshing.value = true;
+  loadError.value = "";
   try {
     [settings.value, nodes.value] = await Promise.all([
       api.getNotificationSettings(),
       api.listNodes(),
     ]);
+    loaded.value = true;
   } catch (error) {
-    handleError(error, "通知设置加载失败。");
+    loadError.value = error instanceof APIError ? error.message : "通知设置加载失败。";
+    if (error instanceof APIError && error.status === 401) emit("session-expired");
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -422,7 +428,7 @@ onMounted(() => load());
       <div class="page-heading__actions"><icon-action :loading="refreshing" label="刷新通知" @click="load"><n-icon><refresh-cw /></n-icon></icon-action><n-button type="primary" @click="openCreate"><template #icon><n-icon><plus /></n-icon></template>添加通道</n-button></div>
     </div>
 
-    <section class="stat-grid" aria-label="通知摘要">
+    <section v-if="!loading" class="stat-grid" aria-label="通知摘要">
       <stat-card label="通知通道">
         <template #icon><webhook :size="18" /></template>
         {{ settings.notifiers.length }}
@@ -445,8 +451,9 @@ onMounted(() => load());
       </stat-card>
     </section>
 
-    <div v-if="loading" class="surface-state"><n-spin :size="28" /></div>
-    <template v-else>
+    <surface-state v-if="loadError" kind="error" :hint="loadError" :busy="refreshing" @action="load()" />
+    <surface-state v-if="loading" kind="loading" stats />
+    <template v-else-if="loaded">
       <section class="notifier-surface">
         <header><span>CHANNELS</span><h3>出站通道</h3></header>
         <div v-if="settings.notifiers.length === 0" class="surface-state surface-state--empty"><webhook :size="27" /><strong>尚未配置通知通道</strong><n-button size="small" type="primary" @click="openCreate">添加通道</n-button></div>
@@ -465,7 +472,7 @@ onMounted(() => load());
           <div><span>AUTOMATION</span><h3>自定义提醒</h3><p>按规则发送概览、活动告警、VPS 到期和流量阈值</p></div>
           <n-button size="small" secondary :disabled="settings.notifiers.length === 0" @click="openReminderCreate"><template #icon><n-icon><plus /></n-icon></template>添加规则</n-button>
         </header>
-        <div v-if="settings.reminder_rules.length === 0" class="surface-state surface-state--empty"><alarm-clock :size="27" /><strong>尚未配置自动提醒</strong><small>先创建通知通道，再设置提醒频率和作用节点</small></div>
+        <div v-if="settings.reminder_rules.length === 0" class="surface-state surface-state--empty"><alarm-clock :size="27" /><strong>尚未配置自动提醒</strong><small>先创建通知通道，再设置提醒频率和作用节点</small><n-button size="small" secondary @click="settings.notifiers.length ? openReminderCreate() : openCreate()">{{ settings.notifiers.length ? '添加规则' : '添加通道' }}</n-button></div>
         <div v-else class="reminder-list">
           <article v-for="rule in settings.reminder_rules" :key="rule.id">
             <div class="reminder-list__icon"><calendar-clock v-if="rule.kind === 'asset_expiry'" :size="18" /><gauge v-else-if="rule.kind === 'traffic_usage'" :size="18" /><alarm-clock v-else :size="18" /></div>
@@ -479,7 +486,7 @@ onMounted(() => load());
 
       <section class="bot-surface">
         <header class="notification-surface-heading"><div><span>TELEGRAM COMMANDS</span><h3>Bot 查询</h3><p>只响应绑定的数字 Chat ID；同一 Bot 不应再被其他程序轮询或配置 webhook</p></div></header>
-        <div v-if="settings.notifiers.every((item) => item.kind !== 'telegram')" class="surface-state surface-state--empty"><bot :size="27" /><strong>没有 Telegram 通道</strong></div>
+        <div v-if="settings.notifiers.every((item) => item.kind !== 'telegram')" class="surface-state surface-state--empty"><bot :size="27" /><strong>没有 Telegram 通道</strong><small>添加 Telegram 通道后可启用 Bot 查询</small><n-button size="small" secondary @click="openCreate">添加通道</n-button></div>
         <div v-else class="bot-list">
           <article v-for="item in settings.notifiers.filter((entry) => entry.kind === 'telegram')" :key="item.id">
             <div class="notifier-list__icon"><bot :size="18" /></div>
@@ -491,7 +498,7 @@ onMounted(() => load());
 
       <section class="ops-surface delivery-surface">
         <header><span>DELIVERY LOG</span><h3>最近投递</h3></header>
-        <div v-if="settings.deliveries.length === 0" class="surface-state surface-state--empty"><send :size="25" /><strong>暂无投递记录</strong></div>
+        <div v-if="settings.deliveries.length === 0" class="surface-state surface-state--empty"><send :size="25" /><strong>暂无投递记录</strong><small>告警或提醒投递后会在此记录结果</small><n-button size="small" secondary @click="load()">刷新记录</n-button></div>
         <div v-else class="ops-table-wrap"><table class="ops-table"><thead><tr><th>通道</th><th>事件</th><th>状态</th><th>尝试</th><th>HTTP</th><th>时间</th><th>错误</th></tr></thead><tbody><tr v-for="item in settings.deliveries" :key="item.id"><td><strong>{{ item.notifier_name }}</strong><small>{{ kindLabel(item.notifier_kind) }}</small></td><td>{{ item.event_type === 'created' ? '告警创建' : '告警恢复' }}</td><td><span class="pill" :class="`pill--${({ queued: 'pressure', retry: 'pressure', delivered: 'signal', failed: 'critical' } as const)[item.status]}`">{{ ({ queued: '排队', retry: '重试', delivered: '已送达', failed: '失败' } as const)[item.status] }}</span></td><td>{{ item.attempt_count }}</td><td>{{ item.response_code || '—' }}</td><td>{{ relativeTime(item.delivered_at || item.created_at) }}</td><td class="delivery-surface__error">{{ item.last_error || '—' }}</td></tr></tbody></table></div>
       </section>
     </template>
