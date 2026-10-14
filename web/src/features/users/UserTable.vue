@@ -87,8 +87,8 @@ function syncState(user: UserRecord): { label: string; state: string } {
           </td>
           <td>
             <div class="user-status-stack">
-              <span class="status-marker" :class="`status-marker--${user.status}`">
-                <i aria-hidden="true" />{{ statusLabels[user.status] }}
+              <span class="pill pill--dot" :class="user.status === 'active' ? 'pill--signal' : user.status === 'expired' ? 'pill--critical' : 'pill--neutral'">
+                {{ statusLabels[user.status] }}
               </span>
               <span class="table-secondary online-inline" :class="{ 'online-inline--active': user.online_connections > 0 }">
                 <wifi :size="12" aria-hidden="true" /> {{ user.online_connections }} 个连接
@@ -115,8 +115,8 @@ function syncState(user: UserRecord): { label: string; state: string } {
           </td>
           <td><span class="user-expiry">{{ formatDateTime(user.expires_at) }}</span></td>
           <td>
-            <span class="sync-state" :class="`sync-state--${syncState(user).state}`">
-              <i aria-hidden="true" />{{ syncState(user).label }}
+            <span class="pill" :class="({ applied: 'pill--signal', pending: 'pill--pressure', error: 'pill--critical' } as Record<string, string>)[syncState(user).state]">
+              {{ syncState(user).label }}
             </span>
           </td>
           <td class="action-cell" @click.stop @keydown.stop>
@@ -162,8 +162,8 @@ function syncState(user: UserRecord): { label: string; state: string } {
           </div>
         </header>
         <div class="user-mobile-item__status">
-          <span class="status-marker" :class="`status-marker--${user.status}`">
-            <i aria-hidden="true" />{{ statusLabels[user.status] }}
+          <span class="pill pill--dot" :class="user.status === 'active' ? 'pill--signal' : user.status === 'expired' ? 'pill--critical' : 'pill--neutral'">
+            {{ statusLabels[user.status] }}
           </span>
           <span>{{ user.assignments.length }} 个节点</span>
           <span class="online-inline" :class="{ 'online-inline--active': user.online_connections > 0 }">
@@ -173,8 +173,8 @@ function syncState(user: UserRecord): { label: string; state: string } {
         <footer>
           <span>{{ formatBytes(user.traffic_used_bytes) }} / {{ user.traffic_limit_bytes ? formatBytes(user.traffic_limit_bytes) : "不限额" }}</span>
           <span>{{ formatDateTime(user.expires_at) }}</span>
-          <span class="sync-state" :class="`sync-state--${syncState(user).state}`">
-            <i aria-hidden="true" />{{ syncState(user).label }}
+          <span class="pill" :class="({ applied: 'pill--signal', pending: 'pill--pressure', error: 'pill--critical' } as Record<string, string>)[syncState(user).state]">
+            {{ syncState(user).label }}
           </span>
         </footer>
 <i v-if="user.traffic_limit_bytes" class="traffic-bar" :class="`is-${severity(percent(user.traffic_used_bytes, user.traffic_limit_bytes))}`">

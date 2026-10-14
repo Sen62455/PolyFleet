@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import {
   ArrowLeft,
@@ -24,7 +25,6 @@ import {
   NSelect,
   NSpin,
   NSwitch,
-  NTag,
   NTooltip,
 } from "naive-ui";
 import { adapterLabels, formatBytes, formatDateTime, progressStatus, quotaPercent, relativeTime } from "../../lib/format";
@@ -284,8 +284,8 @@ function formatLabel(format: string) {
                 <strong>{{ token.name }}</strong>
                 <span class="mono">{{ token.token_prefix }}••••</span>
               </div>
-              <span class="status-marker" :class="`status-marker--${token.status}`">
-                <i aria-hidden="true" />{{ subscriptionState(token).label }}
+              <span class="pill" :class="token.status === 'active' ? 'pill--signal' : 'pill--critical'">
+                {{ subscriptionState(token).label }}
               </span>
             </header>
             <div class="subscription-token-meta">
@@ -375,20 +375,18 @@ function formatLabel(format: string) {
                 <span>{{ adapterLabels[assignment.node_adapter] }} · v{{ assignment.applied_version }} / {{ assignment.desired_version }}</span>
               </div>
               <div class="assignment-tags">
-                <n-tag
+                <status-pill
                   v-if="assignment.management_mode === 'read_only'"
                   type="warning"
-                  size="small"
-                  :bordered="false"
                 >
                   只读导入
-                </n-tag>
-                <n-tag :type="assignmentState(assignment).type" size="small" :bordered="false">
+                </status-pill>
+                <status-pill :type="assignmentState(assignment).type">
                   {{ assignmentState(assignment).label }}
-                </n-tag>
-                <n-tag :type="subscriptionEligibility(assignment).type" size="small" :bordered="false">
+                </status-pill>
+                <status-pill :type="subscriptionEligibility(assignment).type">
                   {{ subscriptionEligibility(assignment).label }}
-                </n-tag>
+                </status-pill>
               </div>
             </header>
             <p v-if="assignment.last_error_message" class="assignment-error">

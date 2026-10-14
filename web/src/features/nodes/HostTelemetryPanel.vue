@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Search } from "@lucide/vue";
 import { NIcon, NInput, NSelect, NSpin, NTag } from "naive-ui";
@@ -142,9 +143,9 @@ defineExpose({ refresh });
         <span v-if="telemetry.sampled_at">Agent 上报于 {{ relativeTime(telemetry.sampled_at) }}</span>
         <span v-else>等待 Agent 上报详细遥测</span>
       </div>
-      <n-tag v-if="telemetry.supported" size="small" :bordered="false">
+      <status-pill v-if="telemetry.supported">
         {{ telemetry.processes.length }} 个进程 · {{ telemetry.services.length }} 个服务
-      </n-tag>
+      </status-pill>
     </header>
 
     <div v-if="errorMessage" class="telemetry-notice telemetry-notice--error">
@@ -226,7 +227,7 @@ defineExpose({ refresh });
             <tbody>
               <tr v-for="service in filteredServices" :key="service.unit">
                 <td><strong :title="service.unit">{{ service.unit }}</strong><small>{{ service.description || "-" }}</small></td>
-                <td><n-tag :type="serviceTagType(service)" size="small" :bordered="false">{{ serviceStateLabel(service.active_state) }}</n-tag></td>
+                <td><status-pill :type="serviceTagType(service)" dot>{{ serviceStateLabel(service.active_state) }}</status-pill></td>
                 <td>{{ serviceStateLabel(service.sub_state) }}</td>
                 <td>{{ formatWorkloadCPU(service.cpu_percent) }}</td>
                 <td>{{ formatWorkloadCPU(service.cpu_peak_percent) }}</td>

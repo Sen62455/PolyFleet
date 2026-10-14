@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   Activity,
@@ -183,11 +184,11 @@ function operationTag(operation: NodeOperationRecord) {
     case "failed":
       return { label: "失败", type: "error" as const };
     case "expired":
-      return { label: "已过期", type: "warning" as const };
+      return { label: "已过期", type: "error" as const };
     case "running":
       return { label: "执行中", type: "info" as const };
     default:
-      return { label: "排队中", type: "default" as const };
+      return { label: "排队中", type: "warning" as const };
   }
 }
 
@@ -338,9 +339,9 @@ watch(
             <strong>{{ operationLabels[operation.type] }}</strong>
             <span>#{{ operation.sequence }} · 第 {{ operation.attempt }} 次</span>
           </div>
-          <n-tag :type="operationTag(operation).type" size="small" :bordered="false">
+          <status-pill :type="operationTag(operation).type">
             {{ operationTag(operation).label }}
-          </n-tag>
+          </status-pill>
         </header>
         <p v-if="operation.error_code" class="operation-error">
           {{ operation.error_code }}<span v-if="operation.error_message"> · {{ operation.error_message }}</span>

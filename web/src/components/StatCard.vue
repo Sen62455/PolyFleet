@@ -11,7 +11,7 @@ defineProps<{
   <component
     :is="clickable ? 'button' : 'article'"
     class="stat-card"
-    :class="`stat-card--${tone ?? 'accent'}`"
+    :class="[`stat-card--${tone ?? 'accent'}`, { 'stat-card--muted': muted }]"
     v-bind="clickable ? { type: 'button' } : {}"
   >
     <span class="stat-card__icon" aria-hidden="true"><slot name="icon" /></span>
@@ -19,7 +19,7 @@ defineProps<{
       <span class="stat-card__label">{{ label }}</span>
       <strong class="stat-card__value" :class="{ 'is-muted': muted }"><slot /></strong>
       <small v-if="$slots.hint" class="stat-card__hint"><slot name="hint" /></small>
-      <slot name="extra" />
+      <div v-if="$slots.extra" class="stat-card__extra"><slot name="extra" /></div>
     </div>
   </component>
 </template>

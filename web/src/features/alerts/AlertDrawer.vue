@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { Bell, Check, RefreshCw } from "@lucide/vue";
 import { NButton, NDrawer, NDrawerContent, NIcon, NSpin, NTag, NTooltip } from "naive-ui";
 import { relativeTime } from "../../lib/format";
@@ -41,9 +42,9 @@ const alertLabels: Record<AlertRecord["type"], string> = {
               <strong>{{ alertLabels[alert.type] }}</strong>
               <button type="button" @click="emit('select-node', alert.node_id)">{{ alert.node_name }}</button>
             </div>
-            <n-tag :type="alert.severity === 'critical' ? 'error' : 'warning'" size="small" :bordered="false">
+            <status-pill :type="alert.severity === 'critical' ? 'error' : 'warning'">
               {{ alert.severity === "critical" ? "严重" : "警告" }}
-            </n-tag>
+            </status-pill>
           </header>
           <p>{{ alert.message }}</p>
           <footer>

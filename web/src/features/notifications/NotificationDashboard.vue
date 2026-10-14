@@ -428,7 +428,7 @@ onMounted(() => load());
         {{ settings.notifiers.length }}
         <template #hint>{{ settings.notifiers.filter((item) => item.enabled).length }} 个启用 · {{ activeReminderCount }} 条自动规则</template>
       </stat-card>
-      <stat-card label="已送达" tone="signal">
+      <stat-card label="已送达" tone="signal" :muted="!delivered">
         <template #icon><check-circle2 :size="18" /></template>
         {{ delivered }}
         <template #hint>最近 30 条投递记录</template>

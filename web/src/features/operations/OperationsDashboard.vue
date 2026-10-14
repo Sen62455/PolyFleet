@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { Activity, CheckCircle2, CircleAlert, ClipboardList, Eye, RefreshCw, RotateCcw } from "@lucide/vue";
 import {
@@ -9,7 +10,6 @@ import {
   NPagination,
   NSelect,
   NSpin,
-  NTag,
   NTooltip,
   useMessage,
 } from "naive-ui";
@@ -115,9 +115,9 @@ function statusTag(status: NodeOperationStatus) {
   switch (status) {
     case "succeeded": return { label: "成功", type: "success" as const };
     case "failed": return { label: "失败", type: "error" as const };
-    case "expired": return { label: "已过期", type: "warning" as const };
+    case "expired": return { label: "已过期", type: "error" as const };
     case "running": return { label: "执行中", type: "info" as const };
-    default: return { label: "排队中", type: "default" as const };
+    default: return { label: "排队中", type: "warning" as const };
   }
 }
 
@@ -155,7 +155,7 @@ onMounted(() => void load());
     </div>
 
     <section class="stat-grid" aria-label="当前页操作摘要">
-      <stat-card label="执行中">
+      <stat-card label="执行中" :muted="!runningCount">
         <template #icon><activity :size="18" /></template>
         {{ runningCount }}
         <template #hint>当前页排队与执行中的任务</template>
@@ -165,7 +165,7 @@ onMounted(() => void load());
         {{ failedCount }}
         <template #hint>当前页需关注的任务</template>
       </stat-card>
-      <stat-card label="成功" tone="signal">
+      <stat-card label="成功" tone="signal" :muted="!succeededCount">
         <template #icon><check-circle2 :size="18" /></template>
         {{ succeededCount }}
         <template #hint>当前页已完成的任务</template>
@@ -204,7 +204,7 @@ onMounted(() => void load());
               <td><button type="button" class="table-link" @click="emit('select-node', operation.node_id)">{{ operation.node_name }}</button></td>
               <td>{{ operationLabels[operation.type] }}</td>
               <td class="num">#{{ operation.sequence }} / {{ operation.attempt }}</td>
-              <td><n-tag :type="statusTag(operation.status).type" size="small" :bordered="false">{{ statusTag(operation.status).label }}</n-tag></td>
+              <td><status-pill :type="statusTag(operation.status).type">{{ statusTag(operation.status).label }}</status-pill></td>
               <td class="num">{{ duration(operation) }}</td>
               <td><span class="operation-summary-text" :class="operation.error_code ? 'error' : operation.output ? 'mono' : ''">{{ summary(operation) }}</span></td>
               <td>{{ operation.requested_by || "-" }}</td>
@@ -227,7 +227,7 @@ onMounted(() => void load());
     <n-drawer :show="selected !== null" width="min(500px, 100vw)" @update:show="!$event && (selected = null)">
       <n-drawer-content v-if="selected" title="操作详情" closable>
         <div class="operation-detail-title">
-          <n-tag :type="statusTag(selected.status).type" size="small" :bordered="false">{{ statusTag(selected.status).label }}</n-tag>
+          <status-pill :type="statusTag(selected.status).type">{{ statusTag(selected.status).label }}</status-pill>
           <strong>{{ operationLabels[selected.type] }}</strong><span>#{{ selected.sequence }}</span>
         </div>
         <dl class="detail-list">

@@ -176,7 +176,7 @@ onMounted(() => load());
         {{ total }}
         <template #hint>当前筛选 {{ subscriptions.length }} 条</template>
       </stat-card>
-      <stat-card label="活跃订阅" tone="signal">
+      <stat-card label="活跃订阅" tone="signal" :muted="!activeCount">
         <template #icon><users-round :size="18" /></template>
         {{ activeCount }}
         <template #hint>本页可正常使用</template>

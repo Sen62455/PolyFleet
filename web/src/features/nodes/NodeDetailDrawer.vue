@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { KeyRound, Pencil } from "@lucide/vue";
 import { NButton, NDrawer, NDrawerContent, NIcon, NTag } from "naive-ui";
 import MetricBar from "../../components/MetricBar.vue";
@@ -91,14 +92,12 @@ function realityHandshakeLabel(node: NodeRecord) {
       <section class="detail-section">
         <div class="detail-section__heading">
           <h2>用户流量与在线</h2>
-          <n-tag
+          <status-pill
             v-if="node.adapter_type === 'native_hysteria2' || node.adapter_type === 'sing_box_vless_reality'"
             :type="node.usage_available ? 'success' : (node.usage_enabled ? 'error' : 'warning')"
-            size="small"
-            :bordered="false"
           >
             {{ node.usage_available ? "统计正常" : (node.usage_enabled ? "统计异常" : "统计未配置") }}
-          </n-tag>
+          </status-pill>
         </div>
         <dl class="detail-list detail-list--two">
           <div><dt>在线用户 / 活跃连接</dt><dd>{{ node.online_users }} / {{ node.online_connections }}</dd></div>

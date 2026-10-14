@@ -184,7 +184,7 @@ function assetExpiryClass(asset?: NodeAssetRecord) {
   if (days === null) return "is-unset";
   if (days <= 7) return "is-critical";
   if (days <= 30) return "is-warning";
-  return "is-healthy";
+  return "is-neutral";
 }
 function shortDate(value: string | null | undefined) {
   if (!value) return "长期有效";

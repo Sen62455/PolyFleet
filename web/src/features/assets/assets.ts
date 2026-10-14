@@ -39,8 +39,8 @@ export function expiryLabel(days: number | null): string {
   return `${days} 天后到期`;
 }
 
-export function expiryTone(days: number | null): "neutral" | "critical" | "pressure" | "signal" {
-  return days === null ? "neutral" : days <= 0 ? "critical" : days <= 30 ? "pressure" : "signal";
+export function expiryTone(days: number | null): "neutral" | "critical" | "pressure" {
+  return days === null ? "neutral" : days <= 7 ? "critical" : days <= 30 ? "pressure" : "neutral";
 }
 
 export function assetCSV(rows: AssetRow[]): string {

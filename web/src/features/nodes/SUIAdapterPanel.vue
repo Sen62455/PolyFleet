@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusPill from "../../components/StatusPill.vue";
 import { computed, ref, watch } from "vue";
 import { ArrowRight, RefreshCw, Save } from "@lucide/vue";
 import {
@@ -9,7 +10,6 @@ import {
   NModal,
   NSelect,
   NSpin,
-  NTag,
   NTooltip,
   useMessage,
 } from "naive-ui";
@@ -243,9 +243,9 @@ watch(
         {{ errorMessage }}
       </n-alert>
       <div class="sui-adapter-summary">
-        <n-tag :type="statusPresentation.type" size="small" :bordered="false">
+        <status-pill :type="statusPresentation.type">
           {{ statusPresentation.label }}
-        </n-tag>
+        </status-pill>
         <span>{{ state.adapter_version || "尚未上报版本" }}</span>
       </div>
       <dl class="detail-list">
@@ -292,11 +292,11 @@ watch(
                 <span>#{{ client.remote_id }} · {{ inboundNames(client) }}</span>
               </div>
               <div class="sui-client-tags">
-                <n-tag v-if="client.online" type="success" size="small" :bordered="false">在线</n-tag>
-                <n-tag v-else size="small" :bordered="false">离线</n-tag>
-                <n-tag v-if="client.management_mode === 'managed'" type="info" size="small" :bordered="false">受管</n-tag>
-                <n-tag v-else-if="client.management_mode === 'read_only'" type="warning" size="small" :bordered="false">只读</n-tag>
-                <n-tag v-else size="small" :bordered="false">未映射</n-tag>
+                <status-pill v-if="client.online" type="success" dot>在线</status-pill>
+                <status-pill v-else type="error" dot>离线</status-pill>
+                <status-pill v-if="client.management_mode === 'managed'" type="info">受管</status-pill>
+                <status-pill v-else-if="client.management_mode === 'read_only'" type="warning">只读</status-pill>
+                <status-pill v-else>未映射</status-pill>
               </div>
             </header>
             <dl class="sui-client-metrics">
