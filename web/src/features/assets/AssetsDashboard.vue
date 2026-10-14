@@ -4,7 +4,6 @@ import { ArrowUpRight, CalendarClock, ChevronDown, CircleAlert, Download, FileQu
 import { NAlert, NButton, NDropdown, NIcon, NInput, NPagination, NSelect, NSpin, NTooltip, useMessage } from "naive-ui";
 import StatCard from "../../components/StatCard.vue";
 import { downloadText, localDate } from "../../lib/export";
-import { statusLabels } from "../../lib/format";
 import type { NodeAssetRecord, NodeRecord } from "../../types";
 import { assetCSV, assetRows, expiryLabel, expiryTone, matchesRenewal, renewalCalendar, type RenewalFilter } from "./assets";
 
@@ -51,6 +50,7 @@ const filteredRows = computed(() => {
 const visibleRows = computed(() => filteredRows.value.slice((page.value - 1) * pageSize, page.value * pageSize));
 const calendarCount = computed(() => filteredRows.value.filter((row) => row.days !== null && row.days >= 0).length);
 const exportOptions = computed(() => [
+  { label: `导出当前筛选的 ${filteredRows.value.length} 条`, key: "scope", disabled: true },
   { label: `资产清单 CSV（${filteredRows.value.length} 台）`, key: "csv" },
   { label: `续费日历 ICS（${calendarCount.value} 项）`, key: "calendar", disabled: !calendarCount.value },
 ]);
@@ -122,8 +122,8 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
           </n-input>
           <n-select v-model:value="provider" clearable :options="providerOptions" placeholder="全部供应商" aria-label="供应商筛选" class="asset-provider" />
           <n-select v-model:value="filter" :options="filterOptions" aria-label="到期状态筛选" class="asset-filter" />
+          <span class="asset-toolbar__summary">匹配 {{ filteredRows.length }} / {{ rows.length }} · 按到期日升序</span>
         </div>
-        <div class="asset-list-caption"><span>匹配 <strong>{{ filteredRows.length }}</strong> / {{ rows.length }} 台资产</span><span>到期日期从近到远 · 按本地日期</span></div>
 
         <div v-if="!rows.length && !error" class="surface-state surface-state--empty">
           <server :size="28" aria-hidden="true" /><strong>添加节点后即可管理资产档案</strong><n-button type="primary" @click="emit('create')">添加节点</n-button>
@@ -137,9 +137,8 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
           <tbody>
             <tr v-for="{ node, asset, days } in visibleRows" :key="node.id">
               <td class="asset-node-cell">
-                <button type="button" class="asset-node-link" @click="emit('select', node)"><strong>{{ node.name }}</strong><arrow-up-right :size="14" aria-hidden="true" /></button>
+                <div class="asset-node-heading"><button type="button" class="asset-node-link" :title="node.name" @click="emit('select', node)"><strong>{{ node.name }}</strong><arrow-up-right :size="14" aria-hidden="true" /></button><span class="chip asset-provider-chip" :title="`${node.provider || '未登记供应商'} · ${node.region || '未登记地区'}`">{{ node.provider || '未登记供应商' }} · {{ node.region || '未登记地区' }}</span></div>
                 <span class="asset-address mono" :title="node.public_host">{{ node.public_host }}</span>
-                <span class="asset-meta"><span :title="node.provider">{{ node.provider || '未登记供应商' }}</span><b>·</b><span>{{ node.region || '未登记地区' }}</span><span class="asset-status" :class="`is-${node.status}`" :title="statusLabels[node.status]" :aria-label="statusLabels[node.status]" /></span>
               </td>
               <td data-label="套餐与备注" class="asset-plan-cell">
                 <strong :title="asset?.plan">{{ asset?.plan || '未填写套餐' }}</strong>
@@ -158,8 +157,7 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
           </tbody>
         </table>
 
-        <footer v-if="filteredRows.length" class="asset-list-footer">
-          <span>导出包含全部 {{ filteredRows.length }} 条筛选结果</span>
+        <footer v-if="filteredRows.length > pageSize" class="asset-list-footer">
           <n-pagination v-if="filteredRows.length > pageSize" v-model:page="page" :page-size="pageSize" :item-count="filteredRows.length" :page-slot="5" size="small" />
         </footer>
       </section>
@@ -179,7 +177,7 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
 .asset-list-caption, .asset-list-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 0 20px 16px; color: var(--hf-muted); font-size: var(--fs-xs); }
 .asset-list-caption strong { color: var(--hf-ink); font-weight: 600; }
 .asset-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-sm); }
-.asset-table th { padding: 10px 20px; border-block: 1px solid var(--hf-line); background: var(--hf-surface-muted); color: var(--hf-muted); text-align: left; font-size: var(--fs-xs); font-weight: 500; }
+.asset-table th { padding: 10px 20px; border-block: 1px solid var(--hf-line); background: var(--hf-surface-muted); color: var(--hf-muted); text-align: left; font-size: var(--fs-xs); font-weight: 600; }
 .asset-table th:nth-child(1) { width: 27%; }
 .asset-table th:nth-child(2) { width: 25%; }
 .asset-table th:nth-child(3) { width: 20%; }
@@ -230,5 +228,17 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
   .asset-table td[data-label]::before { display: block; margin-bottom: 6px; color: var(--hf-muted); font-size: var(--fs-xs); content: attr(data-label); }
   .asset-renewal-cell { text-align: right; }
   .asset-list-footer { padding-inline: 16px; }
+}
+
+.asset-toolbar { align-items: center; padding-bottom: 16px; }
+.asset-toolbar__summary { margin-left: auto; color: var(--hf-muted); font-size: var(--fs-xs); }
+.asset-node-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.asset-node-heading .asset-node-link { min-width: 0; flex: 1; }
+.asset-provider-chip { display: block; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 5px; border: 0; background: var(--hf-hover); color: var(--hf-muted); }
+.asset-note { display: -webkit-box; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .asset-toolbar__summary { width: 100%; margin-left: 0; }
+  .asset-node-cell { grid-column: 1 / -1; }
+  .asset-actions { grid-row: auto; grid-column: 1 / -1; }
 }
 </style>

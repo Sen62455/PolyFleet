@@ -321,14 +321,18 @@ onMounted(() => load());
       <div v-else-if="proxies.length === 0" class="surface-state surface-state--empty">
         <cable :size="26" />
         <strong>尚未配置出口代理</strong>
-        <p>保持现状即可：用户从入口节点直接出网。需要换出口 IP 时，再添加租用代理或落地机。</p>
-        <n-button type="primary" size="small" @click="openCreate">添加出口</n-button>
+        <p>通过租用 IP 或落地机出网，未配置时节点保持直出。</p>
+        <button type="button" class="rack-add exit-empty-add" @click="openCreate"><plus :size="20" /><span>添加出口</span></button>
       </div>
       <div v-else class="exit-cards">
         <article v-for="item in proxies" :key="item.id" class="egress-card">
           <header class="egress-card__head">
             <div><h3>{{ item.name }}</h3><div class="egress-card__tags"><span>{{ kindLabel(item.kind) }}</span><span>{{ item.server_side ? '入口服务器转发' : '客户端链式' }}</span><span class="mono">{{ protocolLabel(item) }}</span></div></div>
-            <span class="pill" :class="item.assignments.length ? 'pill--signal' : 'pill--neutral'">{{ item.assignments.length ? `${item.assignments.length} 台入口` : '未挂入口' }}</span>
+            <div class="egress-card__actions"><span class="pill pill--neutral">{{ item.assignments.length ? `${item.assignments.length} 台入口` : '未挂入口' }}</span>
+            <icon-action label="编辑出口" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action>
+            <icon-action v-if="item.kind === 'landing_vps'" label="落地机指引" @click="openGuide(item)"><n-icon><book-open /></n-icon></icon-action>
+            <icon-action label="删除出口代理" tone="danger" @click="remove(item)"><n-icon><trash-2 /></n-icon></icon-action>
+          </div>
           </header>
           <dl class="egress-card__facts">
             <div><dt>出口地址</dt><dd class="egress-card__endpoint"><span class="mono" :title="endpointLabel(item)">{{ endpointLabel(item) }}</span><n-button size="tiny" quaternary :aria-label="`复制 ${item.name} 出口地址`" @click="copyText(endpointLabel(item), `endpoint:${item.id}`)"><template #icon><n-icon><check v-if="copied === `endpoint:${item.id}`" /><copy-icon v-else /></n-icon></template></n-button></dd></div>
@@ -336,13 +340,8 @@ onMounted(() => load());
             <div><dt>挂接节点</dt><dd class="egress-card__nodes"><span v-for="assignment in item.assignments" :key="assignment.node_id" class="chip">{{ assignment.node_name }}</span><span v-if="!item.assignments.length">节点仍直出</span></dd></div>
           </dl>
           <p v-if="item.notes" class="egress-card__notes">{{ item.notes }}</p>
-          <footer class="egress-card__actions">
-            <icon-action label="编辑出口" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action>
-            <icon-action v-if="item.kind === 'landing_vps'" label="落地机指引" @click="openGuide(item)"><n-icon><book-open /></n-icon></icon-action>
-            <icon-action label="删除出口代理" tone="danger" @click="remove(item)"><n-icon><trash-2 /></n-icon></icon-action>
-          </footer>
+
         </article>
-        <button type="button" class="rack-add" @click="openCreate"><plus :size="20" /><span>添加出口</span></button>
       </div>
     </section>
 
