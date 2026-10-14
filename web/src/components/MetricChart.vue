@@ -25,8 +25,8 @@ const chartRoot = ref<HTMLElement | null>(null);
 const chartCanvas = ref<SVGSVGElement | null>(null);
 const summaryId = `${useId()}-summary`;
 const chartWidth = ref(640);
-const height = 220;
-const padding = { top: 18, right: 24, bottom: 38, left: 82 };
+const height = 238;
+const padding = { top: 18, right: 24, bottom: 46, left: 82 };
 const plotWidth = computed(() => chartWidth.value - padding.left - padding.right);
 const plotHeight = height - padding.top - padding.bottom;
 let resizeObserver: ResizeObserver | null = null;
@@ -143,6 +143,23 @@ function shortTime(value: string | undefined) {
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
 }
 
+const timeTicks = computed(() => {
+  const count = Math.min(5, pointCount.value);
+  const dates = props.labels.map((label) => new Date(label));
+  const showDate = dates.length > 1 && dates[0].toDateString() !== dates[dates.length - 1].toDateString();
+  return Array.from({ length: count }, (_, tick) => {
+    const index = count === 1 ? 0 : Math.round(tick * (pointCount.value - 1) / (count - 1));
+    const date = dates[index];
+    const valid = date && Number.isFinite(date.getTime());
+    return {
+      index,
+      anchor: tick === 0 ? "start" : tick === count - 1 ? "end" : "middle",
+      time: valid ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date) : "",
+      date: valid && showDate ? new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(date) : "",
+    };
+  });
+});
+
 onMounted(() => {
   window.addEventListener("resize", syncCanvasWidth, { passive: true });
   if (typeof ResizeObserver !== "undefined" && chartRoot.value) {
@@ -162,6 +179,9 @@ watch(pointCount, () => void nextTick(syncCanvasWidth));
 
 <template>
   <div ref="chartRoot" class="metric-chart" @mouseleave="clearPointer">
+    <div v-if="lines.length > 1 && pointCount" class="metric-chart__legend" aria-label="图例">
+      <span v-for="line in lines" :key="line.name"><i :style="{ background: line.color }" aria-hidden="true" />{{ line.name }}</span>
+    </div>
     <div v-if="pointCount === 0" class="metric-chart__empty">{{ emptyLabel }}</div>
     <svg
       v-else
@@ -212,9 +232,9 @@ watch(pointCount, () => void nextTick(syncCanvasWidth));
           class="metric-chart__point"
         />
       </g>
-      <text :x="padding.left" :y="height - 7" class="metric-chart__time">{{ shortTime(labels[0]) }}</text>
-      <text :x="chartWidth - padding.right" :y="height - 7" text-anchor="end" class="metric-chart__time">
-        {{ shortTime(labels[labels.length - 1]) }}
+      <text v-for="tick in timeTicks" :key="tick.index" :x="x(tick.index)" :y="height - 24" :text-anchor="tick.anchor" class="metric-chart__time">
+        <tspan :x="x(tick.index)">{{ tick.time }}</tspan>
+        <tspan v-if="tick.date" :x="x(tick.index)" dy="16">{{ tick.date }}</tspan>
       </text>
     </svg>
     <div v-if="activeIndex !== null" class="metric-chart__tooltip">

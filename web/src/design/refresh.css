@@ -1033,3 +1033,14 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
 .egress-card__facts { gap: 12px; margin: 0 16px 16px; padding: 14px; border: 0; border-radius: var(--hf-radius-md); background: var(--hf-surface-muted); }
 .egress-card__facts > div, .egress-card__facts > div + div { padding: 0; border: 0; }
 .exit-empty-add { width: 100%; min-height: 100px; }
+
+/* R10: one container per detail panel, compact meters and explicit chart legends. */
+.console-content .node-workbench .detail-list--two { gap: 0 24px; }
+.console-content .node-workbench .detail-list--two > div { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--hf-line); border-radius: 0; background: transparent; }
+.console-content .node-workbench .detail-list--two dt { flex-shrink: 0; }
+.console-content .node-workbench .detail-list--two dd { margin: 0; text-align: right; font-size: var(--fs-sm); }
+.console-content .node-workbench .detail-list--two > div:last-child { border-bottom: 0; }
+.node-workbench .ping-tool { padding: 14px 0 0; border: 0; border-top: 1px solid var(--hf-line); border-radius: 0; background: transparent; }
+.metric-chart__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; color: var(--hf-muted); font-size: var(--fs-xs); }
+.metric-chart__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.metric-chart__legend i { display: block; width: 14px; height: 3px; border-radius: var(--hf-radius-pill); }

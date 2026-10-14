@@ -548,16 +548,15 @@ watch(() => props.node.id, () => void loadMetrics());
 
 .probe-meters {
   display: grid;
-  flex: 1;
-  align-content: space-evenly;
-  gap: 10px;
+  align-content: start;
+  gap: 14px;
 }
 
 .probe-meter {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 52px;
-  align-items: center;
-  gap: 8px 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px 10px;
 }
 
 .probe-meter span {
@@ -567,6 +566,8 @@ watch(() => props.node.id, () => void loadMetrics());
 }
 
 .probe-meter i {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: block;
   height: 7px;
   overflow: hidden;
@@ -590,6 +591,8 @@ watch(() => props.node.id, () => void loadMetrics());
 }
 
 .probe-meter strong {
+  grid-column: 3;
+  grid-row: 1;
   font-family: var(--hf-data);
   font-size: 12px;
   font-weight: 620;
@@ -598,7 +601,12 @@ watch(() => props.node.id, () => void loadMetrics());
 
 .probe-meter em {
   grid-column: 2 / 3;
-  margin-top: -4px;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin: 0;
   color: var(--hf-muted);
   font-family: var(--hf-data);
   font-size: 12px;
