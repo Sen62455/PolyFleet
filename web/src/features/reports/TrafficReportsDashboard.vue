@@ -30,8 +30,7 @@ function exportReport(kind: ReportExport) {
 }
 
 const change = computed(() => {
-  if (!report.value) return 0;
-  if (!report.value.previous_total_bytes) return report.value.total_bytes ? 100 : 0;
+  if (!report.value || report.value.previous_total_bytes <= 0) return null;
   return ((report.value.total_bytes - report.value.previous_total_bytes) / report.value.previous_total_bytes) * 100;
 });
 const peak = computed(() => report.value?.daily.reduce((best, point) => {
@@ -93,11 +92,14 @@ onMounted(() => load());
       <template #icon><bar-chart3 :size="18" /></template>
       {{ formatBytes(report.total_bytes) }}
       <template #hint>
+        <template v-if="change !== null">
         较上期
         <span class="delta" :class="{ 'is-warning': change > 20 }">
           <trending-up v-if="change >= 0" :size="12" /><trending-down v-else :size="12" />
           {{ change >= 0 ? '+' : '' }}{{ change.toFixed(1) }}%
         </span>
+        </template>
+        <span v-else>暂无上期对比</span>
       </template>
     </stat-card>
     <stat-card label="下行">
@@ -134,12 +136,12 @@ onMounted(() => load());
       <header><span class="rank-icon"><users-round :size="16" /></span><h3>用户用量排行</h3></header>
       <ol v-if="report.top_users.length">
         <li v-for="(item, index) in report.top_users" :key="item.id">
-          <b class="rank-no" :class="{ 'is-top': index < 3 }">{{ index + 1 }}</b>
+          <b class="rank-no" :class="{ 'is-top': index === 0 }">{{ index + 1 }}</b>
           <span class="rank-main">
             <strong>{{ item.name }}</strong>
             <small><arrow-down class="is-down" :size="12" />{{ formatBytes(item.download_bytes) }}<arrow-up class="is-up" :size="12" />{{ formatBytes(item.upload_bytes) }}</small>
           </span>
-          <span class="rank-total">{{ formatBytes(item.total_bytes) }}</span>
+          <span class="rank-total">{{ formatBytes(item.total_bytes) }}<small>{{ report.total_bytes > 0 ? `${share(item.total_bytes).toFixed(1)}% 占比` : '—' }}</small></span>
           <i class="rank-bar" aria-hidden="true"><b :style="{ width: barWidth(item.total_bytes, report.top_users) }" /></i>
         </li>
       </ol>
@@ -149,12 +151,12 @@ onMounted(() => load());
       <header><span class="rank-icon"><server :size="16" /></span><h3>节点用量排行</h3></header>
       <ol v-if="report.top_nodes.length">
         <li v-for="(item, index) in report.top_nodes" :key="item.id">
-          <b class="rank-no" :class="{ 'is-top': index < 3 }">{{ index + 1 }}</b>
+          <b class="rank-no" :class="{ 'is-top': index === 0 }">{{ index + 1 }}</b>
           <span class="rank-main">
             <strong>{{ item.name }}</strong>
             <small><arrow-down class="is-down" :size="12" />{{ formatBytes(item.download_bytes) }}<arrow-up class="is-up" :size="12" />{{ formatBytes(item.upload_bytes) }}</small>
           </span>
-          <span class="rank-total">{{ formatBytes(item.total_bytes) }}</span>
+          <span class="rank-total">{{ formatBytes(item.total_bytes) }}<small>{{ report.total_bytes > 0 ? `${share(item.total_bytes).toFixed(1)}% 占比` : '—' }}</small></span>
           <i class="rank-bar" aria-hidden="true"><b :style="{ width: barWidth(item.total_bytes, report.top_nodes) }" /></i>
         </li>
       </ol>
@@ -233,6 +235,8 @@ onMounted(() => load());
 .rank-main small .is-down { color: var(--hf-chart-primary); }
 .rank-main small .is-up { margin-left: 8px; color: var(--hf-upload-ink); }
 .rank-total { grid-area: total; color: var(--hf-ink); font-size: var(--fs-md); font-weight: 650; font-variant-numeric: tabular-nums; }
+.rank-total { text-align: right; }
+.rank-total small { display: block; margin-top: 2px; color: var(--hf-muted); font-size: var(--fs-xs); font-weight: 400; }
 .rank-bar { grid-area: bar; display: block; height: 4px; overflow: hidden; border-radius: var(--hf-radius-pill); background: var(--hf-line); }
 .rank-bar b { display: block; height: 100%; border-radius: inherit; background: var(--hf-accent); }
 .rank-empty { display: grid; min-height: 180px; place-items: center; color: var(--hf-muted); font-size: var(--fs-sm); }

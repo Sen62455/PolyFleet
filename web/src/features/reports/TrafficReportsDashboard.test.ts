@@ -27,6 +27,18 @@ const report: TrafficReport = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("TrafficReportsDashboard", () => {
+  it("does not invent growth when the previous period has no traffic", async () => {
+    vi.spyOn(api, "trafficReport").mockResolvedValue({ ...report, previous_total_bytes: 0 });
+    const host = defineComponent({
+      components: { NMessageProvider, TrafficReportsDashboard },
+      template: `<n-message-provider><traffic-reports-dashboard /></n-message-provider>`,
+    });
+    const wrapper = mount(host);
+    await flushPromises();
+    expect(wrapper.text()).toContain("暂无上期对比");
+    expect(wrapper.find(".delta").exists()).toBe(false);
+    wrapper.unmount();
+  });
   it("renders a bidirectional trend and both rankings", async () => {
     vi.spyOn(api, "trafficReport").mockResolvedValue(report);
     const host = defineComponent({
