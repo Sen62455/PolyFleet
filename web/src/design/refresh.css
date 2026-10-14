@@ -34,8 +34,12 @@ textarea {
 code,
 pre {
   font-family: var(--hf-mono);
+  font-feature-settings: "zero" 1;
   font-variant-numeric: normal;
 }
+.table-link { text-align: left; }
+table th.num, table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table, .stat-card__value, .metric-bar__value, .rank-total { font-variant-numeric: tabular-nums; }
 
 :root {
   --fs-xs: 12px;

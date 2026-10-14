@@ -230,7 +230,7 @@ function formatLabel(format: string) {
       <div class="user-detail-header">
         <div>
           <h2 :id="`user-detail-${user.id}-title`">{{ user.display_name || user.username }}</h2>
-          <span>@{{ user.username }}</span>
+          <span class="mono">@{{ user.username }}</span>
         </div>
         <span
           class="status-marker"
@@ -295,7 +295,7 @@ function formatLabel(format: string) {
             <header>
               <div>
                 <strong>{{ token.name }}</strong>
-                <span>{{ token.token_prefix }}••••</span>
+                <span class="mono">{{ token.token_prefix }}••••</span>
               </div>
               <span class="status-marker" :class="`status-marker--${token.status}`">
                 <i aria-hidden="true" />{{ subscriptionState(token).label }}

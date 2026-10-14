@@ -203,16 +203,16 @@ onMounted(() => void load());
       <div v-else-if="operations.length === 0" class="operations-page-state">没有匹配的操作记录</div>
       <div v-else class="operations-table-wrap">
         <table class="operations-table">
-          <thead><tr><th>时间</th><th>节点</th><th>操作</th><th>序号 / 尝试</th><th>状态</th><th>耗时</th><th>结果摘要</th><th>操作人</th><th><span class="sr-only">操作</span></th></tr></thead>
+          <thead><tr><th>时间</th><th>节点</th><th>操作</th><th class="num">序号 / 尝试</th><th>状态</th><th class="num">耗时</th><th>结果摘要</th><th>操作人</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="operation in operations" :key="operation.id">
               <td>{{ formatDateTime(operation.created_at, false) }}</td>
               <td><button type="button" class="table-link" @click="emit('select-node', operation.node_id)">{{ operation.node_name }}</button></td>
               <td>{{ operationLabels[operation.type] }}</td>
-              <td>#{{ operation.sequence }} / {{ operation.attempt }}</td>
+              <td class="num">#{{ operation.sequence }} / {{ operation.attempt }}</td>
               <td><n-tag :type="statusTag(operation.status).type" size="small" :bordered="false">{{ statusTag(operation.status).label }}</n-tag></td>
-              <td>{{ duration(operation) }}</td>
-              <td><span class="operation-summary-text" :class="{ error: operation.error_code }">{{ summary(operation) }}</span></td>
+              <td class="num">{{ duration(operation) }}</td>
+              <td><span class="operation-summary-text" :class="operation.error_code ? 'error' : operation.output ? 'mono' : ''">{{ summary(operation) }}</span></td>
               <td>{{ operation.requested_by || "-" }}</td>
               <td>
                 <div class="row-actions">
@@ -251,7 +251,7 @@ onMounted(() => void load());
         <dl class="detail-list">
           <div><dt>节点</dt><dd>{{ selected.node_name }}</dd></div>
           <div><dt>尝试</dt><dd>第 {{ selected.attempt }} 次</dd></div>
-          <div v-if="selected.target"><dt>目标 IP</dt><dd>{{ selected.target }}</dd></div>
+          <div v-if="selected.target"><dt>目标 IP</dt><dd class="mono">{{ selected.target }}</dd></div>
           <div><dt>提交时间</dt><dd>{{ formatDateTime(selected.created_at, false) }}</dd></div>
           <div><dt>完成时间</dt><dd>{{ formatDateTime(selected.completed_at, false) }}</dd></div>
           <div><dt>耗时</dt><dd>{{ duration(selected) }}</dd></div>

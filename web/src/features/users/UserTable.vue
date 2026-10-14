@@ -81,7 +81,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
               <span class="user-avatar" aria-hidden="true">{{ (user.display_name || user.username).slice(0, 1).toUpperCase() }}</span>
               <span>
                 <strong>{{ user.display_name || user.username }}</strong>
-                <small>@{{ user.username }}</small>
+                <small class="mono">@{{ user.username }}</small>
               </span>
             </div>
           </td>

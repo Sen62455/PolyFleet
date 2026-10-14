@@ -344,12 +344,12 @@ watch(() => props.node.id, () => void loadMetrics());
       <article class="workbench-card">
         <header>
           <h2>系统信息</h2>
-          <small>{{ node.hostname || "尚未上报主机名" }}</small>
+          <small :class="{ mono: node.hostname }">{{ node.hostname || "尚未上报主机名" }}</small>
         </header>
         <dl class="detail-list detail-list--two">
           <div><dt>操作系统</dt><dd>{{ [node.os_name, node.os_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
-          <div><dt>架构 / 内核</dt><dd>{{ [node.architecture || "-", node.kernel_version].filter(Boolean).join(" · ") }}</dd></div>
-          <div><dt>Agent / 核心</dt><dd>{{ node.agent_version || "尚未注册" }} · {{ [node.core_name, node.core_version].filter(Boolean).join(" ") || "尚未上报" }}</dd></div>
+          <div><dt>架构 / 内核</dt><dd class="mono">{{ [node.architecture || "-", node.kernel_version].filter(Boolean).join(" · ") }}</dd></div>
+          <div><dt>Agent / 核心</dt><dd><span :class="{ mono: node.agent_version }">{{ node.agent_version || "尚未注册" }}</span> · <span :class="{ mono: node.core_version }">{{ [node.core_name, node.core_version].filter(Boolean).join(" ") || "尚未上报" }}</span></dd></div>
           <div><dt>负载 1 / 5 / 15</dt><dd>{{ node.load_1.toFixed(2) }} / {{ node.load_5.toFixed(2) }} / {{ node.load_15.toFixed(2) }}</dd></div>
           <div><dt>累计收发</dt><dd>{{ formatBytes(node.network_rx_bytes_total) }} / {{ formatBytes(node.network_tx_bytes_total) }}</dd></div>
           <div><dt>在线 / 未识别</dt><dd>{{ node.online_users }} 用户 · {{ node.online_unknown_users }} 未识别</dd></div>
