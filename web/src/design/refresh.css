@@ -1044,3 +1044,12 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
 .metric-chart__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; color: var(--hf-muted); font-size: var(--fs-xs); }
 .metric-chart__legend span { display: inline-flex; align-items: center; gap: 6px; }
 .metric-chart__legend i { display: block; width: 14px; height: 3px; border-radius: var(--hf-radius-pill); }
+
+/* R11: one assignment chip and a keyboard-readable full list. */
+.assignment-inline { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.assignment-inline .chip:first-child { display: block; min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assignment-inline .chip--more { flex-shrink: 0; color: var(--hf-accent); cursor: pointer; font: inherit; font-size: var(--fs-xs); }
+.assignment-popover { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+@media (min-width: 1280px) {
+  .users-workspace--detail .user-table .user-nodes-column { display: none; }
+}

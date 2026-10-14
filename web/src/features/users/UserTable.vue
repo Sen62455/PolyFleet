@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AssignmentList from "../../components/AssignmentList.vue";
 import { h } from "vue";
 import { Archive, MoreHorizontal, Pencil, Settings2, Wifi } from "@lucide/vue";
 import { NButton, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
@@ -56,7 +57,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
         <tr>
           <th>用户</th>
           <th>状态</th>
-          <th>节点</th>
+          <th class="user-nodes-column">节点</th>
           <th>流量</th>
           <th>到期时间</th>
           <th>配置同步</th>
@@ -95,15 +96,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
               </span>
             </div>
           </td>
-          <td>
-            <div v-if="user.assignments.length" class="assignment-inline">
-              <span v-for="assignment in user.assignments.slice(0, 2)" :key="assignment.id">
-                {{ assignment.node_name }}
-              </span>
-              <span v-if="user.assignments.length > 2">+{{ user.assignments.length - 2 }}</span>
-            </div>
-            <span v-else class="table-muted">未分配</span>
-          </td>
+          <td class="user-nodes-column"><assignment-list :assignments="user.assignments" /></td>
           <td>
             <span class="traffic-value" :class="{ 'traffic-value--limited': user.quota_state === 'limited' }">
               {{ formatBytes(user.traffic_used_bytes) }}

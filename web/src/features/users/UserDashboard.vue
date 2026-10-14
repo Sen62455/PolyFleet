@@ -532,7 +532,7 @@ function updateCompactDetail(event?: MediaQueryListEvent) {
   compactDetail.value = event?.matches ?? compactDetailQuery?.matches ?? false;
 }
 onMounted(() => {
-  compactDetailQuery = window.matchMedia("(max-width: 1180px)");
+  compactDetailQuery = window.matchMedia("(max-width: 1279px)");
   updateCompactDetail();
   compactDetailQuery.addEventListener("change", updateCompactDetail);
   loadUsers();
