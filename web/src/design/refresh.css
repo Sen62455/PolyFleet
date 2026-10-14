@@ -994,3 +994,15 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
 .user-detail-header .user-toggle-label { flex: 0 0 auto; color: var(--hf-muted); font-size: var(--fs-xs); }
 .notification-workspace :is(.notifier-surface, .reminder-surface, .bot-surface, .delivery-surface) > header { border-bottom-color: color-mix(in srgb, var(--hf-line) 50%, transparent); }
 .notification-workspace :is(.notifier-list, .reminder-list, .bot-list) article:hover { background: var(--hf-hover); }
+
+/* R7: readable errors retain the original diagnostic on hover and focus. */
+.err-summary { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; max-width: 100%; border-radius: var(--hf-radius-sm); }
+.err-code { padding: 1px 6px; border-radius: var(--hf-radius-sm); background: var(--hf-critical-soft); color: var(--hf-critical-deep); font: 600 var(--fs-xs)/1.5 var(--hf-mono); overflow-wrap: anywhere; }
+.err-text { color: var(--hf-ink-soft); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.operation-item > .err-summary { margin-top: 8px; }
+.operation-history-error { margin-top: 8px; }
+.operation-history-error summary { color: var(--hf-muted); font-size: var(--fs-xs); cursor: pointer; }
+.operation-history-error summary span { margin-left: 8px; }
+.operation-history-error[open] > .err-summary { margin-top: 8px; }
+.clamp-2 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.err-summary .err-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

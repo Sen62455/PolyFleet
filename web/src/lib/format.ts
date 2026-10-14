@@ -99,3 +99,28 @@ export function progressStatus(value: number): "default" | "warning" | "error" {
   const level = severity(value);
   return level === "critical" ? "error" : level === "warning" ? "warning" : "default";
 }
+
+const operationErrorLabels: Record<string, string> = {
+  operation_invalid: "操作参数或类型无效，请查看原始原因",
+  operation_expired: "操作在 Agent 领取前已过期",
+  ping_failed: "目标没有响应 Ping",
+  core_inactive: "代理核心未运行",
+  core_log_failed: "读取核心日志失败",
+  core_config_not_configured: "该节点尚未配置核心配置文件路径",
+  config_backup_failed: "备份配置失败",
+  core_restart_failed: "重启核心失败",
+};
+
+export function operationErrorText(code?: string, message?: string): string {
+  if (!code) return message || "";
+  if (code === "operation_invalid" && /operation type is unsupported/i.test(message || "")) {
+    return "该节点的 Agent 不支持此操作，请升级 Agent 后重试";
+  }
+  if (operationErrorLabels[code]) return operationErrorLabels[code];
+  if (code.startsWith("reality_")) return "Reality 配置处理失败，请查看原始原因";
+  return message || code;
+}
+
+export function isHistoricalFailure(status: string, timestamp: string | null, now = Date.now()): boolean {
+  return (status === "failed" || status === "expired") && !!timestamp && now - Date.parse(timestamp) > 7 * 86400000;
+}

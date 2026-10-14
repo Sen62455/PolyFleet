@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ErrorSummary from "../../components/ErrorSummary.vue";
 import StatusPill from "../../components/StatusPill.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { Activity, CheckCircle2, CircleAlert, ClipboardList, Eye, RefreshCw, RotateCcw } from "@lucide/vue";
@@ -206,7 +207,7 @@ onMounted(() => void load());
               <td class="num">#{{ operation.sequence }} / {{ operation.attempt }}</td>
               <td><status-pill :type="statusTag(operation.status).type">{{ statusTag(operation.status).label }}</status-pill></td>
               <td class="num">{{ duration(operation) }}</td>
-              <td><span class="operation-summary-text" :class="operation.error_code ? 'error' : operation.output ? 'mono' : ''">{{ summary(operation) }}</span></td>
+              <td><error-summary v-if="operation.error_code || operation.error_message" :code="operation.error_code" :message="operation.error_message" /><span v-else class="operation-summary-text clamp-2" :class="{ mono: operation.output }" :title="summary(operation)">{{ summary(operation) }}</span></td>
               <td>{{ operation.requested_by || "-" }}</td>
               <td>
                 <div class="row-actions">
@@ -240,7 +241,7 @@ onMounted(() => void load());
           <div><dt>操作人</dt><dd>{{ selected.requested_by || "-" }}</dd></div>
           <div v-if="selected.rolled_back"><dt>回滚</dt><dd>已恢复最近可用配置</dd></div>
         </dl>
-        <p v-if="selected.error_code" class="operation-error">{{ selected.error_code }}<span v-if="selected.error_message"> · {{ selected.error_message }}</span></p>
+        <error-summary v-if="selected.error_code || selected.error_message" :code="selected.error_code" :message="selected.error_message" />
         <section v-if="selected.output" class="operation-detail-output"><h3>输出</h3><pre>{{ selected.output }}</pre></section>
       </n-drawer-content>
     </n-drawer>

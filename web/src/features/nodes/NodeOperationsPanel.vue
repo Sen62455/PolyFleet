@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ErrorSummary from "../../components/ErrorSummary.vue";
+import { isHistoricalFailure } from "../../lib/format";
 import StatusPill from "../../components/StatusPill.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -343,12 +345,15 @@ watch(
             {{ operationTag(operation).label }}
           </status-pill>
         </header>
-        <p v-if="operation.error_code" class="operation-error">
-          {{ operation.error_code }}<span v-if="operation.error_message"> · {{ operation.error_message }}</span>
-        </p>
+        <details v-if="isHistoricalFailure(operation.status, operation.completed_at || operation.created_at)" class="operation-history-error">
+          <summary><code class="err-code">{{ operation.error_code || '历史失败' }}</code><span>历史记录 · 展开原因与输出</span></summary>
+          <error-summary :code="operation.error_code" :message="operation.error_message" />
+          <pre v-if="operation.output && !compact" class="operation-output">{{ operation.output }}</pre>
+        </details>
+        <error-summary v-else-if="operation.error_code || operation.error_message" :code="operation.error_code" :message="operation.error_message" />
         <div class="operation-meta">
           <span>{{ relativeTime(operation.completed_at || operation.created_at) }}</span>
-          <span v-if="operation.target">目标 {{ operation.target }}</span>
+          <span v-if="operation.target">目标 <span class="mono">{{ operation.target }}</span></span>
           <span v-if="operation.rolled_back">已恢复最近可用配置</span>
           <n-button
             v-if="operation.status === 'failed' || operation.status === 'expired'"
@@ -360,7 +365,7 @@ watch(
             重试
           </n-button>
         </div>
-        <pre v-if="operation.output && !compact" class="operation-output">{{ operation.output }}</pre>
+        <pre v-if="operation.output && !compact && !isHistoricalFailure(operation.status, operation.completed_at || operation.created_at)" class="operation-output">{{ operation.output }}</pre>
       </article>
     </div>
     <div v-else class="operations-state">尚无运维操作</div>
