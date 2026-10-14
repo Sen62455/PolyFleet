@@ -101,7 +101,7 @@ describe("NotificationDashboard", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("运维 Telegram");
-    expect(wrapper.text()).toContain("最终失败1");
+    expect(wrapper.text().replace(/\s+/g, "")).toContain("最终失败1");
     expect(wrapper.text()).toContain("notification endpoint returned HTTP 500");
     expect(wrapper.text()).toContain("每 6 小时运行概览");
     expect(wrapper.text()).toContain("/status");

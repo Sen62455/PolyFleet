@@ -200,19 +200,19 @@ onMounted(() => void load());
       <surface-state v-if="loading" kind="loading" stats />
       <surface-state v-else-if="!operations.length && !loadError" kind="empty" title="没有匹配的操作记录" hint="调整筛选查看历史记录，或从节点详情发起运维操作。" action-label="重置并刷新" @action="nodeFilter = ''; typeFilter = ''; statusFilter = ''; page = 1; load()" />
       <div v-else class="operations-table-wrap">
-        <table class="operations-table">
+        <table class="operations-table mobile-ledger">
           <thead><tr><th>时间</th><th>节点</th><th>操作</th><th class="num">序号 / 尝试</th><th>状态</th><th class="num">耗时</th><th>结果摘要</th><th>操作人</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="operation in operations" :key="operation.id">
-              <td>{{ formatDateTime(operation.created_at, false) }}</td>
-              <td><button type="button" class="table-link" @click="emit('select-node', operation.node_id)">{{ operation.node_name }}</button></td>
-              <td>{{ operationLabels[operation.type] }}</td>
-              <td class="num">#{{ operation.sequence }} / {{ operation.attempt }}</td>
-              <td><status-pill :type="statusTag(operation.status).type">{{ statusTag(operation.status).label }}</status-pill></td>
-              <td class="num">{{ duration(operation) }}</td>
-              <td><error-summary v-if="operation.error_code || operation.error_message" :code="operation.error_code" :message="operation.error_message" /><span v-else class="operation-summary-text clamp-2" :class="{ mono: operation.output }" :title="summary(operation)">{{ summary(operation) }}</span></td>
-              <td>{{ operation.requested_by || "-" }}</td>
-              <td>
+              <td data-label="时间">{{ formatDateTime(operation.created_at, false) }}</td>
+              <td data-label="节点"><button type="button" class="table-link" :title="operation.node_name" @click="emit('select-node', operation.node_id)">{{ operation.node_name }}</button></td>
+              <td data-label="任务">{{ operationLabels[operation.type] }}</td>
+              <td data-label="序号 / 尝试" class="num">#{{ operation.sequence }} / {{ operation.attempt }}</td>
+              <td data-label="状态"><status-pill :type="statusTag(operation.status).type">{{ statusTag(operation.status).label }}</status-pill></td>
+              <td data-label="耗时" class="num">{{ duration(operation) }}</td>
+              <td data-label="结果摘要"><error-summary v-if="operation.error_code || operation.error_message" :code="operation.error_code" :message="operation.error_message" /><span v-else class="operation-summary-text clamp-2" :class="{ mono: operation.output }" :title="summary(operation)">{{ summary(operation) }}</span></td>
+              <td data-label="操作人">{{ operation.requested_by || "-" }}</td>
+              <td data-label="操作">
                 <div class="row-actions">
                   <icon-action v-if="operation.status === 'failed' || operation.status === 'expired'" label="重试操作" :loading="retrying === operation.id" @click="retry(operation)"><n-icon><rotate-ccw /></n-icon></icon-action>
                   <icon-action label="查看操作详情" @click="selected = operation"><n-icon><eye /></n-icon></icon-action>

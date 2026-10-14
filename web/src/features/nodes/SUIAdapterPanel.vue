@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import StatusPill from "../../components/StatusPill.vue";
 import { computed, ref, watch } from "vue";
 import { ArrowRight, RefreshCw, Save } from "@lucide/vue";
@@ -10,7 +11,6 @@ import {
   NModal,
   NSelect,
   NSpin,
-  NTooltip,
   useMessage,
 } from "naive-ui";
 import { api, APIError } from "../../api";
@@ -221,14 +221,14 @@ watch(
   <section class="detail-section sui-panel">
     <div class="detail-section__heading">
       <h2>S-UI 适配器</h2>
-      <n-tooltip trigger="hover">
+      <hint-tooltip trigger="hover">
         <template #trigger>
           <n-button circle quaternary size="small" :loading="refreshing" aria-label="刷新 S-UI 状态" @click="load()">
             <template #icon><n-icon><refresh-cw /></n-icon></template>
           </n-button>
         </template>
         刷新
-      </n-tooltip>
+      </hint-tooltip>
     </div>
 
     <div v-if="loading" class="sui-panel__state"><n-spin :size="22" /></div>
@@ -267,14 +267,14 @@ watch(
             :options="inboundOptions"
             placeholder="选择目标入站"
           />
-          <n-tooltip trigger="hover">
+          <hint-tooltip trigger="hover">
             <template #trigger>
               <n-button circle type="primary" :loading="savingTargets" aria-label="保存目标入站" @click="saveTargets">
                 <template #icon><n-icon><save /></n-icon></template>
               </n-button>
             </template>
             保存目标入站
-          </n-tooltip>
+          </hint-tooltip>
         </div>
         <div v-else class="sui-panel__state sui-panel__state--empty">未发现 Hysteria2 入站</div>
       </div>
@@ -326,7 +326,7 @@ watch(
             </div>
             <div v-else class="sui-client-mapping">
               <span>映射到 @{{ client.mapped_username }}</span>
-              <n-tooltip v-if="client.management_mode === 'read_only'" trigger="hover">
+              <hint-tooltip v-if="client.management_mode === 'read_only'" trigger="hover">
                 <template #trigger>
                   <n-button
                     secondary
@@ -340,7 +340,7 @@ watch(
                   </n-button>
                 </template>
                 {{ adoptHint(client) }}
-              </n-tooltip>
+              </hint-tooltip>
             </div>
           </article>
         </div>

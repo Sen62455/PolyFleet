@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   ArrowDown,
@@ -10,7 +11,7 @@ import {
   Pencil,
   RefreshCw,
 } from "@lucide/vue";
-import { NButton, NIcon, NInputNumber, NProgress, NSelect, NSpin, NTooltip, useMessage } from "naive-ui";
+import { NButton, NIcon, NInputNumber, NProgress, NSelect, NSpin, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import MetricChart, { type ChartSeries } from "../../components/MetricChart.vue";
 import NodeSignalRail from "../../components/NodeSignalRail.vue";
@@ -225,14 +226,14 @@ watch(() => props.node.id, () => void loadMetrics());
         </div>
       </div>
       <div class="node-workbench__actions">
-        <n-tooltip trigger="hover">
+        <hint-tooltip trigger="hover">
           <template #trigger>
             <n-button circle secondary aria-label="刷新监控" :loading="metricsLoading" @click="refreshMonitoring">
               <template #icon><n-icon><refresh-cw /></n-icon></template>
             </n-button>
           </template>
           刷新
-        </n-tooltip>
+        </hint-tooltip>
         <n-button secondary @click="emit('edit', node)">
           <template #icon><n-icon><pencil /></n-icon></template>编辑
         </n-button>
@@ -678,7 +679,7 @@ watch(() => props.node.id, () => void loadMetrics());
   margin-bottom: 10px;
 }
 
-.node-workbench :deep(.ping-tool) { display: block; padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--hf-line); background: var(--hf-surface-muted); }
+.node-workbench :deep(.ping-tool) { display: block; padding: 14px 0 0; margin-bottom: 12px; border: 0; border-top: 1px solid var(--hf-line); border-radius: 0; background: transparent; }
 
 .node-workbench :deep(.ping-tool__identity span),
 .node-workbench :deep(.ping-tool > small) {

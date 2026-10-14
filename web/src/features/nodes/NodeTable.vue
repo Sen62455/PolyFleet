@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import { computed, h } from "vue";
 import { Archive, KeyRound, MoreHorizontal, Pencil, ServerCog, Wifi } from "@lucide/vue";
-import { NButton, NCheckbox, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
+import { NButton, NCheckbox, NDropdown, NIcon, type DropdownOption } from "naive-ui";
 import MetricBar from "../../components/MetricBar.vue";
 import StatusIndicator from "../../components/StatusIndicator.vue";
 import {
@@ -118,14 +119,14 @@ function choose(key: string | number, node: NodeRecord) {
           </td>
           <td class="action-cell" @click.stop @keydown.stop>
             <n-dropdown trigger="click" :options="options" @select="choose($event, node)">
-              <n-tooltip trigger="hover">
+              <hint-tooltip trigger="hover">
                 <template #trigger>
                   <n-button quaternary circle :aria-label="`${node.name} 操作`">
                     <template #icon><n-icon><more-horizontal /></n-icon></template>
                   </n-button>
                 </template>
                 操作
-              </n-tooltip>
+              </hint-tooltip>
             </n-dropdown>
           </td>
         </tr>

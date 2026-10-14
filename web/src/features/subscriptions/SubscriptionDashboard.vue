@@ -212,21 +212,21 @@ onMounted(() => load());
       <surface-state v-if="loading" kind="loading" stats />
       <surface-state v-else-if="!subscriptions.length && !loadError" kind="empty" title="没有符合条件的订阅" hint="可重置筛选；新订阅需在用户详情中创建。" action-label="重置并刷新" @action="search = ''; setFilter('current')" />
       <div v-else class="ops-table-wrap">
-        <table class="ops-table subscription-table">
+        <table class="ops-table subscription-table mobile-ledger">
           <thead><tr><th>订阅 / 用户</th><th>状态</th><th>双向流量</th><th>有效期</th><th>最近活动</th><th class="num">节点</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="item in subscriptions" :key="item.token_id">
-              <td><strong>{{ item.name || "默认订阅" }}</strong><small>{{ item.display_name || item.username }} · <code class="mono">{{ item.token_prefix }}…</code></small></td>
-              <td><span class="pill" :class="`pill--${statusTone(item.status)}`">{{ statusLabel(item.status) }}</span><span class="proto-list"><span v-for="format in item.allowed_formats" :key="format" class="proto">{{ formatNames[format] ?? format }}</span></span></td>
-              <td class="subscription-table__traffic">
+              <td data-label="订阅 / 用户"><strong>{{ item.name || "默认订阅" }}</strong><small>{{ item.display_name || item.username }} · <code class="mono">{{ item.token_prefix }}…</code></small></td>
+              <td data-label="状态与协议"><span class="pill" :class="`pill--${statusTone(item.status)}`">{{ statusLabel(item.status) }}</span><span class="proto-list"><span v-for="format in item.allowed_formats" :key="format" class="proto">{{ formatNames[format] ?? format }}</span></span></td>
+              <td data-label="双向流量" class="subscription-table__traffic">
                 <div class="traffic-line"><strong>{{ formatBytes(item.traffic_used_bytes) }}</strong>
                 <small>{{ item.traffic_limit_bytes ? `/ ${formatBytes(item.traffic_limit_bytes)} · ${quotaPercent(item).toFixed(0)}%` : "不限量" }}</small></div>
                 <i v-if="item.traffic_limit_bytes" :class="`is-${item.status === 'exhausted' ? 'critical' : severity(quotaPercent(item))}`"><span :style="{ width: `${quotaPercent(item)}%` }" /></i>
               </td>
-              <td><strong>{{ expiry(item) }}</strong><small>Token / 用户取较早值</small></td>
-              <td><strong>{{ relativeTime(item.last_used_at || item.last_traffic_at) }}</strong><small>{{ item.last_used_at ? "订阅已拉取" : "尚未拉取" }}</small></td>
-              <td class="num"><strong class="node-count"><i :class="{ 'is-online': item.online_nodes > 0 }" />{{ Math.min(item.online_nodes, item.assignment_count) }} <span>/ {{ item.assignment_count }}</span></strong><small>用户在线 / 已分配</small></td>
-              <td class="ops-table__actions"><icon-action label="调整订阅" :disabled="item.status === 'revoked'" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action><icon-action tone="danger" :disabled="item.status === 'revoked'" label="吊销订阅" @click="revoke(item)"><n-icon><shield-off /></n-icon></icon-action></td>
+              <td data-label="有效期"><strong>{{ expiry(item) }}</strong><small>Token / 用户取较早值</small></td>
+              <td data-label="最近活动"><strong>{{ relativeTime(item.last_used_at || item.last_traffic_at) }}</strong><small>{{ item.last_used_at ? "订阅已拉取" : "尚未拉取" }}</small></td>
+              <td data-label="用户节点" class="num"><strong class="node-count"><i :class="{ 'is-online': item.online_nodes > 0 }" />{{ Math.min(item.online_nodes, item.assignment_count) }} <span>/ {{ item.assignment_count }}</span></strong><small>用户在线 / 已分配</small></td>
+              <td data-label="操作" class="ops-table__actions"><icon-action label="调整订阅" :disabled="item.status === 'revoked'" @click="openEdit(item)"><n-icon><pencil /></n-icon></icon-action><icon-action tone="danger" :disabled="item.status === 'revoked'" label="吊销订阅" @click="revoke(item)"><n-icon><shield-off /></n-icon></icon-action></td>
             </tr>
           </tbody>
         </table>

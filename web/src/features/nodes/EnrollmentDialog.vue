@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import { computed, ref, watch } from "vue";
 import { Check, Copy as CopyIcon, KeyRound } from "@lucide/vue";
-import { NAlert, NButton, NIcon, NModal, NSpin, NTooltip, useMessage } from "naive-ui";
+import { NAlert, NButton, NIcon, NModal, NSpin, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import type { EnrollmentToken, NodeRecord } from "../../types";
 
@@ -110,7 +111,7 @@ watch(
       <section class="code-section">
         <div class="code-section__header">
           <div><key-round :size="16" aria-hidden="true" /><strong>环境变量</strong></div>
-          <n-tooltip trigger="hover">
+          <hint-tooltip trigger="hover">
             <template #trigger>
               <n-button
                 quaternary
@@ -122,7 +123,7 @@ watch(
               </n-button>
             </template>
             {{ copied === "token" ? "已复制" : "复制" }}
-          </n-tooltip>
+          </hint-tooltip>
         </div>
         <pre>HYFLEET_ENROLLMENT_TOKEN={{ token.enrollment_token }}</pre>
       </section>
@@ -130,7 +131,7 @@ watch(
       <section class="code-section">
         <div class="code-section__header">
           <strong>agent.yaml</strong>
-          <n-tooltip trigger="hover">
+          <hint-tooltip trigger="hover">
             <template #trigger>
               <n-button
                 quaternary
@@ -142,7 +143,7 @@ watch(
               </n-button>
             </template>
             {{ copied === "config" ? "已复制" : "复制" }}
-          </n-tooltip>
+          </hint-tooltip>
         </div>
         <pre>{{ agentConfig }}</pre>
       </section>

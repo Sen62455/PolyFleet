@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Ban, Gauge, Wifi, Plus, RefreshCw, Search, UsersRound } from "@lucide/vue";
-import { NAlert, NButton, NIcon, NInput, NSpin, NTooltip, useDialog, useMessage } from "naive-ui";
+import { NAlert, NButton, NIcon, NInput, NSpin, useDialog, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import type {
   NodeRecord,
@@ -566,14 +567,14 @@ onBeforeUnmount(() => {
         <p>账户状态、到期时间与节点授权</p>
       </div>
       <div class="page-heading__actions">
-        <n-tooltip trigger="hover">
+        <hint-tooltip trigger="hover">
           <template #trigger>
             <n-button circle secondary aria-label="刷新用户" :loading="refreshing" @click="loadUsers()">
               <template #icon><n-icon><refresh-cw /></n-icon></template>
             </n-button>
           </template>
           刷新
-        </n-tooltip>
+        </hint-tooltip>
         <n-button type="primary" @click="openCreate">
           <template #icon><n-icon><plus /></n-icon></template>
           添加用户

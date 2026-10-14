@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ArrowUpRight, CalendarClock, ChevronDown, CircleAlert, Download, FileQuestion, Package, RefreshCw, Search, Server } from "@lucide/vue";
-import { NAlert, NButton, NDropdown, NIcon, NInput, NPagination, NSelect, NSpin, NTooltip, useMessage } from "naive-ui";
+import { NAlert, NButton, NDropdown, NIcon, NInput, NPagination, NSelect, NSpin, useMessage } from "naive-ui";
 import StatCard from "../../components/StatCard.vue";
 import { downloadText, localDate } from "../../lib/export";
 import type { NodeAssetRecord, NodeRecord } from "../../types";
@@ -87,9 +88,9 @@ onBeforeUnmount(() => window.clearInterval(dateTimer));
     <div class="page-heading page-heading--console">
       <div><h2>资产与续费</h2><p>集中管理 VPS 档案，按到期日期安排续费</p></div>
       <div class="page-heading__actions">
-        <n-tooltip trigger="hover"><template #trigger>
+        <hint-tooltip trigger="hover"><template #trigger>
           <n-button circle secondary :loading="refreshing" aria-label="刷新资产" @click="emit('refresh')"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button>
-        </template>刷新</n-tooltip>
+        </template>刷新</hint-tooltip>
         <n-dropdown trigger="click" :options="exportOptions" @select="exportAssets">
           <n-button secondary :disabled="loading || !!error || !filteredRows.length">
             <template #icon><n-icon><download /></n-icon></template>导出筛选结果<chevron-down :size="14" class="asset-export-chevron" />

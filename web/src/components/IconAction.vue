@@ -8,9 +8,9 @@ const focused = ref(false);
 </script>
 
 <template>
-  <n-tooltip trigger="manual" :show="hovered || focused">
+  <n-tooltip trigger="manual" role="tooltip" :show="hovered || focused">
     <template #trigger>
-      <span class="icon-action-wrap" @mouseenter="hovered = true" @mouseleave="hovered = false" @focusin="focused = true" @focusout="focused = false">
+      <span class="icon-action-wrap" @mouseenter="hovered = true" @mouseleave="hovered = false" @focusin="focused = true" @focusout="focused = false" @keydown.esc="hovered = focused = false">
         <n-button v-bind="$attrs" class="icon-action" :class="`icon-action--${tone}`" quaternary circle size="small" :aria-label="label" :disabled="disabled" :loading="loading">
           <template #icon><slot /></template>
         </n-button>

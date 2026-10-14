@@ -449,8 +449,8 @@ function onCardDragEnd() {
                   <strong>{{ subscription.name || subscription.username }}</strong>
                   <small>{{ subscription.display_name || subscription.username }}</small>
                 </span>
-                <span><i class="subscription-status" :class="`is-${subscription.status}`">{{ subscriptionLabels[subscription.status] }}</i></span>
-                <span class="subscription-health__nodes"><strong>{{ subscription.online_nodes }} / {{ subscription.assignment_count }}</strong></span>
+                <span><span class="pill" :class="`pill--${({ active: 'signal', expiring: 'pressure', exhausted: 'critical', expired: 'critical', revoked: 'critical', disabled: 'neutral' } as const)[subscription.status]}`">{{ subscriptionLabels[subscription.status] }}</span></span>
+                <span class="subscription-health__nodes"><strong>{{ Math.min(subscription.online_nodes, subscription.assignment_count) }} / {{ subscription.assignment_count }}</strong></span>
                 <span class="subscription-health__expiry" :class="{ 'is-critical': ['expired', 'expiring'].includes(subscription.status) }">
                   <strong>{{ shortDate(subscriptionExpiry(subscription)) }}</strong>
                 </span>

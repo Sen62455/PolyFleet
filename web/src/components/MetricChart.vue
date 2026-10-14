@@ -27,7 +27,8 @@ const summaryId = `${useId()}-summary`;
 const chartWidth = ref(640);
 const height = 238;
 const padding = { top: 18, right: 24, bottom: 46, left: 82 };
-const plotWidth = computed(() => chartWidth.value - padding.left - padding.right);
+const leftPadding = computed(() => chartWidth.value < 400 ? Math.min(70, Math.max(40, props.valueFormatter(maximum.value).length * 6.5 + 8)) : padding.left);
+const plotWidth = computed(() => chartWidth.value - leftPadding.value - padding.right);
 const plotHeight = height - padding.top - padding.bottom;
 let resizeObserver: ResizeObserver | null = null;
 
@@ -75,7 +76,7 @@ const chartSummary = computed(() => {
 });
 
 function x(index: number) {
-  return padding.left + (pointCount.value <= 1 ? 0 : (index / (pointCount.value - 1)) * plotWidth.value);
+  return leftPadding.value + (pointCount.value <= 1 ? 0 : (index / (pointCount.value - 1)) * plotWidth.value);
 }
 
 function y(value: number) {
@@ -101,13 +102,13 @@ function move(event: MouseEvent | PointerEvent) {
   if (pointCount.value === 0) return;
   const bounds = (event.currentTarget as SVGElement).getBoundingClientRect();
   const relative = ((event.clientX - bounds.left) / bounds.width) * chartWidth.value;
-  const ratio = Math.max(0, Math.min(1, (relative - padding.left) / plotWidth.value));
+  const ratio = Math.max(0, Math.min(1, (relative - leftPadding.value) / plotWidth.value));
   selectIndex(Math.round(ratio * (pointCount.value - 1)));
 }
 
 function syncCanvasWidth() {
   const measured = chartCanvas.value?.getBoundingClientRect().width;
-  if (measured && Number.isFinite(measured)) chartWidth.value = Math.max(280, Math.round(measured));
+  if (measured && Number.isFinite(measured)) chartWidth.value = Math.max(160, Math.round(measured));
 }
 
 function focusChart() {
@@ -153,7 +154,7 @@ const timeTicks = computed(() => {
     const valid = date && Number.isFinite(date.getTime());
     return {
       index,
-      anchor: tick === 0 ? "start" : tick === count - 1 ? "end" : "middle",
+      anchor: "middle",
       time: valid ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date) : "",
       date: valid && showDate ? new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(date) : "",
     };
@@ -200,8 +201,8 @@ watch(pointCount, () => void nextTick(syncCanvasWidth));
       @pointermove="move"
     >
       <g v-for="tick in ticks" :key="tick.ratio">
-        <line :x1="padding.left" :x2="chartWidth - padding.right" :y1="tick.y" :y2="tick.y" class="metric-chart__grid" />
-        <text :x="padding.left - 7" :y="tick.y + 4" text-anchor="end" class="metric-chart__axis-label">
+        <line :x1="leftPadding" :x2="chartWidth - padding.right" :y1="tick.y" :y2="tick.y" class="metric-chart__grid" />
+        <text :x="leftPadding - 7" :y="tick.y + 4" text-anchor="end" class="metric-chart__axis-label">
           {{ valueFormatter(tick.value) }}
         </text>
       </g>

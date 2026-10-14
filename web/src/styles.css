@@ -1283,7 +1283,7 @@ pre {
 }
 
 .operation-item > header strong,
-.operation-item > header span,
+.operation-item > header span:not(.pill),
 .backup-row strong,
 .backup-row span {
   display: block;
@@ -1295,7 +1295,7 @@ pre {
   font-size: 12px;
 }
 
-.operation-item > header span,
+.operation-item > header span:not(.pill),
 .operation-meta,
 .backup-row span {
   margin-top: 3px;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import StatusPill from "../../components/StatusPill.vue";
 import { Bell, Check, RefreshCw } from "@lucide/vue";
 import { NButton, NDrawer, NDrawerContent, NIcon, NSpin, NTag, NTooltip } from "naive-ui";
@@ -50,7 +51,7 @@ const alertLabels: Record<AlertRecord["type"], string> = {
           <footer>
             <span>{{ relativeTime(alert.last_seen_at) }}</span>
             <span v-if="alert.status === 'acknowledged'">已确认</span>
-            <n-tooltip v-else trigger="hover">
+            <hint-tooltip v-else trigger="hover">
               <template #trigger>
                 <n-button
                   circle
@@ -64,7 +65,7 @@ const alertLabels: Record<AlertRecord["type"], string> = {
                 </n-button>
               </template>
               确认告警
-            </n-tooltip>
+            </hint-tooltip>
           </footer>
         </article>
       </div>

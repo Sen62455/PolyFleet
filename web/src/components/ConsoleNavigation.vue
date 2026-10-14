@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "./HintTooltip.vue";
 import {
   BarChart3,
   BellRing,
@@ -12,7 +13,6 @@ import {
   Server,
   UsersRound,
 } from "@lucide/vue";
-import { NTooltip } from "naive-ui";
 import BrandMark from "./BrandMark.vue";
 import { consolePages, type DashboardView } from "../lib/navigation";
 
@@ -49,7 +49,7 @@ function active(key: string) {
     <nav class="console-nav__menu" aria-label="主导航">
       <template v-for="group in ['监控', '管理', '运营', '审计']" :key="group">
         <span v-if="!collapsed || mobile" class="console-nav__group-label">{{ group }}</span>
-        <n-tooltip
+        <hint-tooltip
           v-for="item in navigation.filter((entry) => entry.group === group)"
           :key="item.key"
           trigger="hover"
@@ -70,7 +70,7 @@ function active(key: string) {
             </button>
           </template>
           {{ item.label }}
-        </n-tooltip>
+        </hint-tooltip>
       </template>
     </nav>
 

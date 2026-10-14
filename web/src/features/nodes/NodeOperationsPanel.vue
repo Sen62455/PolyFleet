@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import ErrorSummary from "../../components/ErrorSummary.vue";
 import { isHistoricalFailure } from "../../lib/format";
@@ -14,7 +15,7 @@ import {
   ScrollText,
   Undo2,
 } from "@lucide/vue";
-import { NButton, NIcon, NInput, NSpin, NTag, NTooltip, useDialog, useMessage } from "naive-ui";
+import { NButton, NIcon, NInput, NSpin, NTag, useDialog, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import { formatBytes, formatDateTime, relativeTime } from "../../lib/format";
 import type {
@@ -219,19 +220,19 @@ watch(
       <h2>运维</h2>
       <div class="operations-panel__heading-actions">
         <n-button v-if="compact" text type="primary" size="small" @click="emit('view-all')">查看全部操作</n-button>
-        <n-tooltip trigger="hover">
+        <hint-tooltip trigger="hover">
           <template #trigger>
             <n-button circle quaternary size="small" :loading="refreshing" aria-label="刷新运维记录" @click="load()">
               <template #icon><n-icon><refresh-cw /></n-icon></template>
             </n-button>
           </template>
           刷新
-        </n-tooltip>
+        </hint-tooltip>
       </div>
     </div>
 
     <div class="operations-toolbar" aria-label="节点运维操作">
-      <n-tooltip trigger="hover">
+      <hint-tooltip trigger="hover">
         <template #trigger>
           <n-button size="small" secondary :loading="working === 'probe_core'" aria-label="探测核心" @click="createOperation('probe_core')">
             <template #icon><n-icon><activity /></n-icon></template>
@@ -239,8 +240,8 @@ watch(
           </n-button>
         </template>
         探测核心
-      </n-tooltip>
-      <n-tooltip trigger="hover">
+      </hint-tooltip>
+      <hint-tooltip trigger="hover">
         <template #trigger>
           <n-button size="small" secondary :loading="working === 'restart_core'" aria-label="重启核心" @click="restartCore">
             <template #icon><n-icon><rotate-cw /></n-icon></template>
@@ -248,8 +249,8 @@ watch(
           </n-button>
         </template>
         重启核心
-      </n-tooltip>
-      <n-tooltip trigger="hover">
+      </hint-tooltip>
+      <hint-tooltip trigger="hover">
         <template #trigger>
           <n-button
             size="small"
@@ -264,8 +265,8 @@ watch(
           </n-button>
         </template>
         {{ node.adapter_type === "sing_box_vless_reality" ? "Reality 日志读取已禁用" : "最近 100 行日志" }}
-      </n-tooltip>
-      <n-tooltip trigger="hover">
+      </hint-tooltip>
+      <hint-tooltip trigger="hover">
         <template #trigger>
           <n-button
             size="small"
@@ -280,8 +281,8 @@ watch(
           </n-button>
         </template>
         {{ node.adapter_type === "s_ui" ? "S-UI 数据库不做在线文件复制" : "备份核心配置" }}
-      </n-tooltip>
-      <n-tooltip v-if="node.adapter_type === 'sing_box_vless_reality'" trigger="hover">
+      </hint-tooltip>
+      <hint-tooltip v-if="node.adapter_type === 'sing_box_vless_reality'" trigger="hover">
         <template #trigger>
           <n-button
             size="small"
@@ -296,7 +297,7 @@ watch(
           </n-button>
         </template>
         {{ canRotateRealityIdentity ? "轮换 Reality 身份" : "等待当前身份与配置完成应用" }}
-      </n-tooltip>
+      </hint-tooltip>
       <n-button
         v-if="node.adapter_type !== 'standalone_sing_box'"
         size="small"

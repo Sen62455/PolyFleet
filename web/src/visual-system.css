@@ -1300,7 +1300,7 @@ body {
 }
 
 .metric-chart__time {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -1964,7 +1964,7 @@ body {
   color: var(--hf-ink-soft);
 }
 
-.operation-detail-title span,
+.operation-detail-title span:not(.pill),
 .operations-page-state {
   color: var(--hf-muted);
 }
@@ -1984,7 +1984,7 @@ body {
   color: var(--hf-ink);
 }
 
-.operation-item > header span,
+.operation-item > header span:not(.pill),
 .operation-meta,
 .backup-row span,
 .alert-record > footer {

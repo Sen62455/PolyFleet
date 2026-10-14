@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import AssignmentList from "../../components/AssignmentList.vue";
 import { h } from "vue";
 import { Archive, MoreHorizontal, Pencil, Settings2, Wifi } from "@lucide/vue";
-import { NButton, NDropdown, NIcon, NTooltip, type DropdownOption } from "naive-ui";
+import { NButton, NDropdown, NIcon, type DropdownOption } from "naive-ui";
 import { formatBytes, formatDateTime, percent, severity } from "../../lib/format";
 import type { UserRecord } from "../../types";
 
@@ -114,14 +115,14 @@ function syncState(user: UserRecord): { label: string; state: string } {
           </td>
           <td class="action-cell" @click.stop @keydown.stop>
             <n-dropdown trigger="click" :options="options" @select="choose($event, user)">
-              <n-tooltip trigger="hover">
+              <hint-tooltip trigger="hover">
                 <template #trigger>
                   <n-button quaternary circle :aria-label="`${user.username} 操作`">
                     <template #icon><n-icon><more-horizontal /></n-icon></template>
                   </n-button>
                 </template>
                 操作
-              </n-tooltip>
+              </hint-tooltip>
             </n-dropdown>
           </td>
         </tr>
@@ -150,7 +151,7 @@ function syncState(user: UserRecord): { label: string; state: string } {
               <span class="user-avatar" aria-hidden="true">{{ (user.display_name || user.username).slice(0, 1).toUpperCase() }}</span>
             <span>
               <strong>{{ user.display_name || user.username }}</strong>
-              <small>@{{ user.username }}</small>
+              <small class="mono">@{{ user.username }}</small>
             </span>
           </div>
         </header>

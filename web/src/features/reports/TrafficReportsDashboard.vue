@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import { ArrowDown, ArrowUp, BarChart3, ChevronDown, Download, RefreshCw, Server, TrendingDown, TrendingUp, UsersRound, Zap } from "@lucide/vue";
-import { NAlert, NButton, NDropdown, NIcon, NSpin, NTooltip, useMessage } from "naive-ui";
+import { NAlert, NButton, NDropdown, NIcon, NSpin, useMessage } from "naive-ui";
 import { api, APIError } from "../../api";
 import StatCard from "../../components/StatCard.vue";
 import TrafficTrendChart from "../../components/TrafficTrendChart.vue";
@@ -80,7 +81,7 @@ onMounted(() => load());
       <div><h2>流量报表</h2><p>按控制面已接收批次统计，上下行合计为双向用量</p></div>
       <div class="page-heading__actions">
         <div class="ops-segments"><button :class="{ 'is-active': range === '7d' }" :disabled="refreshing" type="button" @click="setRange('7d')">7 天</button><button :class="{ 'is-active': range === '30d' }" :disabled="refreshing" type="button" @click="setRange('30d')">30 天</button></div>
-        <n-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新报表" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</n-tooltip>
+        <hint-tooltip trigger="hover"><template #trigger><n-button circle secondary :loading="refreshing" aria-label="刷新报表" @click="load"><template #icon><n-icon><refresh-cw /></n-icon></template></n-button></template>刷新</hint-tooltip>
         <n-dropdown trigger="click" :options="exportOptions" @select="exportReport"><n-button secondary :disabled="!report || refreshing"><template #icon><n-icon><download /></n-icon></template>导出报表<chevron-down :size="14" style="margin-left: 8px" /></n-button></n-dropdown>
       </div>
     </div>

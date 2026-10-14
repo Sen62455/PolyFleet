@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -25,7 +26,6 @@ import {
 	NLayoutSider,
 	NSelect,
 	NSpin,
-	NTooltip,
 	useDialog,
 	useMessage,
 } from "naive-ui";
@@ -543,24 +543,24 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="console-header__actions">
-            <n-tooltip trigger="hover" :disabled="quickSwitcherOpen"><template #trigger>
-              <n-button quaternary circle aria-label="快速跳转" @click="openQuickSwitcher"><template #icon><n-icon><search /></n-icon></template></n-button>
-            </template>快速跳转 · Ctrl / ⌘ K</n-tooltip>
+            <hint-tooltip trigger="hover" :disabled="quickSwitcherOpen"><template #trigger>
+              <n-button quaternary class="console-quick-search" aria-label="快速跳转" @click="openQuickSwitcher"><template #icon><n-icon><search /></n-icon></template><span>搜索节点、用户…</span><kbd>Ctrl / ⌘ K</kbd></n-button>
+            </template>快速跳转 · Ctrl / ⌘ K</hint-tooltip>
             <span class="console-header__live" :class="{ 'is-warning': issues > 0 || !!loadError }">
               <i />
               <span>{{ headerStatus }}</span>
-              <time tabindex="0" :datetime="lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined" :title="`最近成功同步：${syncTimestamp}`" :aria-label="`${syncFreshness}，最近成功同步：${syncTimestamp}`">{{ syncFreshness }}</time>
+              <hint-tooltip><template #trigger><time tabindex="0" :datetime="lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined" :aria-label="`${syncFreshness}，最近成功同步：${syncTimestamp}`">{{ syncFreshness }}</time></template>最近成功同步：{{ syncTimestamp }}</hint-tooltip>
             </span>
-            <n-tooltip trigger="hover">
+            <hint-tooltip trigger="hover">
               <template #trigger>
                 <n-button quaternary circle aria-label="刷新当前数据" :loading="refreshing" @click="refreshDashboard">
                   <template #icon><n-icon><refresh-cw /></n-icon></template>
                 </n-button>
               </template>
               刷新
-            </n-tooltip>
+            </hint-tooltip>
             <color-mode-picker />
-            <n-tooltip trigger="hover">
+            <hint-tooltip trigger="hover">
               <template #trigger>
                 <n-badge :value="alerts.length" :max="99" :show="alerts.length > 0">
                   <n-button
@@ -574,7 +574,7 @@ onBeforeUnmount(() => {
                 </n-badge>
               </template>
               告警
-            </n-tooltip>
+            </hint-tooltip>
             <n-dropdown trigger="click" :options="accountOptions" @select="handleAccountAction">
               <button class="console-header__account" type="button" aria-label="打开账户菜单">
                 <n-avatar round :size="32">{{ props.session.admin.username.slice(0, 1).toUpperCase() }}</n-avatar>
@@ -612,14 +612,14 @@ onBeforeUnmount(() => {
                 <p>{{ onlineCount }} / {{ nodes.length }} 台主机正在响应</p>
               </div>
               <div class="page-heading__actions">
-                <n-tooltip trigger="hover">
+                <hint-tooltip trigger="hover">
                   <template #trigger>
                     <n-button circle secondary aria-label="刷新节点" :loading="refreshing" @click="loadNodes()">
                       <template #icon><n-icon><refresh-cw /></n-icon></template>
                     </n-button>
                   </template>
                   刷新
-                </n-tooltip>
+                </hint-tooltip>
                 <n-button type="primary" @click="openCreate">
                   <template #icon><n-icon><plus /></n-icon></template>
                   添加节点

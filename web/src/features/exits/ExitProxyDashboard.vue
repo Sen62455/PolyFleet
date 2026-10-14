@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import SurfaceState from "../../components/SurfaceState.vue";
 import { computed, onMounted, ref } from "vue";
 import {
@@ -28,7 +29,6 @@ import {
   NSelect,
   NSpin,
   NSwitch,
-  NTooltip,
   useDialog,
   useMessage,
 } from "naive-ui";
@@ -298,14 +298,14 @@ onMounted(() => load());
         <p>通过租用 IP 或落地机出网。支持客户端链式连接，或由已配置好的入口服务器转发。</p>
       </div>
       <div class="page-heading__actions">
-        <n-tooltip trigger="hover">
+        <hint-tooltip trigger="hover">
           <template #trigger>
             <n-button circle secondary :loading="refreshing" aria-label="刷新出口代理" @click="load()">
               <template #icon><n-icon><refresh-cw /></n-icon></template>
             </n-button>
           </template>
           刷新
-        </n-tooltip>
+        </hint-tooltip>
         <n-button type="primary" @click="openCreate">
           <template #icon><n-icon><plus /></n-icon></template>
           添加出口

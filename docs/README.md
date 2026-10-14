@@ -43,6 +43,7 @@
 - [订阅运营、流量报表、通知与 VPS 资产](18-operations-layer.zh-CN.md)
 - [出口代理与落地机](19-exit-proxies.zh-CN.md)
 - [资产续费、数据导出与快捷导航](20-console-productivity.zh-CN.md)
+- [控制台第二轮 UI / UX 优化](21-ui-round2.zh-CN.md)
 - [安装、升级、校验和与灾难恢复](16-phase-7-public-release.md)
 
 这些文件保留了相应功能首次交付时的验收细节。执行命令前，应把示例版本替换为准备安装

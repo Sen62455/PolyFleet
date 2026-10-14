@@ -9,7 +9,7 @@ const raw = computed(() => [props.code, props.message].filter(Boolean).join(" ·
 </script>
 
 <template>
-  <n-tooltip :show="hovered || focused" placement="top" :style="{ maxWidth: 'min(480px, 90vw)', overflowWrap: 'anywhere' }">
+  <n-tooltip role="tooltip" :show="hovered || focused" placement="top" :style="{ maxWidth: 'min(480px, 90vw)', overflowWrap: 'anywhere' }">
     <template #trigger>
       <span class="err-summary" tabindex="0" :title="raw" @mouseenter="hovered = true" @mouseleave="hovered = false" @focus="focused = true" @blur="focused = false" @keydown.esc="hovered = focused = false">
         <code v-if="code" class="err-code">{{ code }}</code>

@@ -178,16 +178,16 @@ defineExpose({ refresh });
         </div>
         <div v-if="telemetry.processes_available && sortedProcesses.length === 0" class="telemetry-notice telemetry-notice--inline">本次采样没有进程数据。</div>
         <div v-if="sortedProcesses.length > 0" class="telemetry-table-wrap">
-          <table class="telemetry-table telemetry-table--processes">
-            <thead><tr><th>进程</th><th>PID</th><th>systemd 单元</th><th>CPU</th><th>内存</th><th>运行时间</th></tr></thead>
+          <table class="mobile-ledger telemetry-table telemetry-table--processes">
+            <thead><tr><th>进程</th><th class="num">PID</th><th>systemd 单元</th><th class="num">CPU</th><th class="num">内存</th><th class="num">运行时间</th></tr></thead>
             <tbody>
               <tr v-for="process in sortedProcesses" :key="process.pid">
-                <td><strong>{{ process.name || "未知进程" }}</strong></td>
-                <td>{{ process.pid }}</td>
-                <td :title="process.unit">{{ process.unit || "-" }}</td>
-                <td>{{ formatWorkloadCPU(process.cpu_percent) }}</td>
-                <td>{{ formatBytes(process.rss_bytes) }}</td>
-                <td>{{ formatUptime(process.uptime_seconds) }}</td>
+                <td data-label="进程"><strong>{{ process.name || "未知进程" }}</strong></td>
+                <td class="num" data-label="PID">{{ process.pid }}</td>
+                <td :title="process.unit" data-label="systemd 单元">{{ process.unit || "-" }}</td>
+                <td class="num" data-label="CPU">{{ formatWorkloadCPU(process.cpu_percent) }}</td>
+                <td class="num" data-label="内存">{{ formatBytes(process.rss_bytes) }}</td>
+                <td class="num" data-label="运行时间">{{ formatUptime(process.uptime_seconds) }}</td>
               </tr>
             </tbody>
           </table>
@@ -222,19 +222,19 @@ defineExpose({ refresh });
         </div>
         <div v-if="telemetry.services_available && filteredServices.length === 0" class="telemetry-notice telemetry-notice--inline">没有符合条件的 systemd 服务。</div>
         <div v-if="filteredServices.length > 0" class="telemetry-table-wrap telemetry-table-wrap--services">
-          <table class="telemetry-table telemetry-table--services">
-            <thead><tr><th>服务</th><th>状态</th><th>子状态</th><th>CPU</th><th title="Agent 本次运行期间的峰值">CPU 峰值</th><th>内存</th><th>内存峰值</th><th title="当前任务数 / systemd 自动重启次数">任务 / 重启</th><th>主 PID</th></tr></thead>
+          <table class="mobile-ledger telemetry-table telemetry-table--services">
+            <thead><tr><th>服务</th><th>状态</th><th>子状态</th><th class="num">CPU</th><th title="Agent 本次运行期间的峰值" class="num">CPU 峰值</th><th class="num">内存</th><th class="num">内存峰值</th><th title="当前任务数 / systemd 自动重启次数" class="num">任务 / 重启</th><th class="num">主 PID</th></tr></thead>
             <tbody>
               <tr v-for="service in filteredServices" :key="service.unit">
-                <td><strong :title="service.unit">{{ service.unit }}</strong><small>{{ service.description || "-" }}</small></td>
-                <td><status-pill :type="serviceTagType(service)" dot>{{ serviceStateLabel(service.active_state) }}</status-pill></td>
-                <td>{{ serviceStateLabel(service.sub_state) }}</td>
-                <td>{{ formatWorkloadCPU(service.cpu_percent) }}</td>
-                <td>{{ formatWorkloadCPU(service.cpu_peak_percent) }}</td>
-                <td>{{ formatBytes(service.memory_bytes) }}</td>
-                <td>{{ formatBytes(service.memory_peak_bytes) }}</td>
-                <td>{{ service.tasks }} / {{ service.restarts }}</td>
-                <td>{{ service.main_pid || "-" }}</td>
+                <td data-label="服务"><strong :title="service.unit">{{ service.unit }}</strong><small>{{ service.description || "-" }}</small></td>
+                <td data-label="状态"><status-pill :type="serviceTagType(service)" dot>{{ serviceStateLabel(service.active_state) }}</status-pill></td>
+                <td data-label="子状态">{{ serviceStateLabel(service.sub_state) }}</td>
+                <td class="num" data-label="CPU">{{ formatWorkloadCPU(service.cpu_percent) }}</td>
+                <td class="num" data-label="CPU 峰值">{{ formatWorkloadCPU(service.cpu_peak_percent) }}</td>
+                <td class="num" data-label="内存">{{ formatBytes(service.memory_bytes) }}</td>
+                <td class="num" data-label="内存峰值">{{ formatBytes(service.memory_peak_bytes) }}</td>
+                <td class="num" data-label="任务 / 重启">{{ service.tasks }} / {{ service.restarts }}</td>
+                <td class="num" data-label="主 PID">{{ service.main_pid || "-" }}</td>
               </tr>
             </tbody>
           </table>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import HintTooltip from "../../components/HintTooltip.vue";
 import { Copy, KeyRound } from "@lucide/vue";
-import { NButton, NIcon, NModal, NTooltip, useMessage } from "naive-ui";
+import { NButton, NIcon, NModal, useMessage } from "naive-ui";
 import type { UserCredential } from "../../types";
 
 defineProps<{
@@ -41,14 +42,14 @@ async function copyCredential(value: string) {
             <strong>{{ item.node_name }}</strong>
             <small>{{ item.credential_fingerprint }}</small>
           </div>
-          <n-tooltip trigger="hover">
+          <hint-tooltip trigger="hover">
             <template #trigger>
               <n-button circle quaternary :aria-label="`复制 ${item.node_name} 凭据`" @click="copyCredential(item.credential)">
                 <template #icon><n-icon><copy /></n-icon></template>
               </n-button>
             </template>
             复制凭据
-          </n-tooltip>
+          </hint-tooltip>
         </header>
         <code>{{ item.credential }}</code>
       </section>
