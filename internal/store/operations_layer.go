@@ -246,6 +246,7 @@ func (s *Store) ListSubscriptionOperations(
 		       v.traffic_upload_bytes, v.traffic_download_bytes, v.traffic_used_bytes,
 		       (SELECT COUNT(*) FROM node_user_assignments a WHERE a.user_id = v.user_id),
 		       (SELECT COUNT(DISTINCT o.node_id) FROM node_online_users o
+		        JOIN node_user_assignments a ON a.node_id = o.node_id AND a.user_id = o.user_id
 		        WHERE o.user_id = v.user_id AND o.connections > 0),
 		       v.created_at, v.updated_at
 		FROM subscription_view v WHERE `+whereSQL+`
