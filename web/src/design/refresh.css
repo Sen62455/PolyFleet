@@ -1,4 +1,17 @@
 /* Yunfan / 云帆: final presentation layer. */
+.auth-screen__header {
+  max-width: none;
+  margin: 0;
+  padding-inline: max(28px, calc((100% - 1180px) / 2 + 28px));
+}
+.auth-panel .n-input .n-input__input-el:-webkit-autofill,
+.auth-panel .n-input .n-input__input-el:-webkit-autofill:hover,
+.auth-panel .n-input .n-input__input-el:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--hf-surface) inset;
+  -webkit-text-fill-color: var(--hf-ink);
+  caret-color: var(--hf-ink);
+  transition: background-color 9999s ease-out 0s;
+}
 :root {
   --hf-body: 'Inter Variable', Inter, 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
   --hf-display: var(--hf-body);
