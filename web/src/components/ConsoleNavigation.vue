@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import {
-  Activity,
   BarChart3,
   BellRing,
   Cable,
@@ -24,9 +22,6 @@ const props = withDefaults(defineProps<{
   activeView: NavigationView;
   collapsed?: boolean;
   mobile?: boolean;
-  online: number;
-  total: number;
-  issues: number;
 }>(), { collapsed: false, mobile: false });
 
 const emit = defineEmits<{
@@ -36,9 +31,6 @@ const emit = defineEmits<{
 
 const icons = { overview: LayoutDashboard, nodes: Server, users: UsersRound, assets: CalendarClock, exits: Cable, subscriptions: KeyRound, reports: BarChart3, notifications: BellRing, operations: ClipboardList };
 const navigation = consolePages.map((page) => ({ ...page, icon: icons[page.key] }));
-
-const segmentCount = computed(() => Math.min(props.total, 12));
-const onlineSegments = computed(() => props.total ? Math.round(props.online / props.total * segmentCount.value) : 0);
 
 function active(key: string) {
   return key === "nodes"
@@ -83,24 +75,6 @@ function active(key: string) {
     </nav>
 
     <div class="console-nav__spacer" />
-
-    <section v-if="!collapsed || mobile" class="console-nav__health" aria-label="系统健康">
-      <header><activity :size="15" aria-hidden="true" /><span>系统健康</span></header>
-      <div>
-        <strong>{{ online }} / {{ total }}</strong>
-        <span :class="{ 'is-warning': issues > 0 }">{{ issues ? `${issues} 项需关注` : total ? "全部在线" : "等待节点" }}</span>
-      </div>
-      <div class="console-nav__segments" aria-hidden="true"><i v-for="n in segmentCount" :key="n" :class="n <= onlineSegments ? 'is-on' : 'is-off'" /></div>
-    </section>
-
-    <n-tooltip v-else trigger="hover" placement="right">
-      <template #trigger>
-        <div class="console-nav__health-dot" :class="{ 'is-warning': issues > 0 }" :aria-label="`${online} / ${total} 台在线`">
-          <activity :size="18" aria-hidden="true" />
-        </div>
-      </template>
-      {{ online }} / {{ total }} 台在线
-    </n-tooltip>
 
     <button
       v-if="!mobile"

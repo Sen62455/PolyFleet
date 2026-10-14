@@ -1006,3 +1006,17 @@ button:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 3px;
 .operation-history-error[open] > .err-summary { margin-top: 8px; }
 .clamp-2 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .err-summary .err-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+/* R8: navigation stays focused; freshness reflects a successful data refresh. */
+.console-header__live time { min-width: 76px; font-variant-numeric: tabular-nums; }
+.probe-rack__controls { flex-wrap: wrap; }
+.probe-card__grip { opacity: .35; transition: opacity 160ms var(--hf-ease); }
+.probe-card:hover .probe-card__grip, .probe-card:focus-within .probe-card__grip { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .probe-card__head .n-checkbox { opacity: 0; transition: opacity 160ms var(--hf-ease); }
+  .probe-grid.has-selection .n-checkbox, .probe-card:hover .n-checkbox, .probe-card:focus-within .n-checkbox { opacity: 1; }
+}
+@media (hover: none) { .probe-card__grip { opacity: 1; } }
+.rack-node__facts { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.rack-node__facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--hf-line); }
+.rack-node__facts dd { margin: 0; }

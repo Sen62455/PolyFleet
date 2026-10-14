@@ -313,10 +313,11 @@ function onCardDragEnd() {
             <n-button v-if="selectedNodeIDs.length" size="small" secondary @click="emit('nodes', selectedNodeIDs)">
               批量操作 ({{ selectedNodeIDs.length }})
             </n-button>
+            <n-button type="primary" size="small" @click="emit('create')"><template #icon><n-icon><plus /></n-icon></template>添加节点</n-button>
           </div>
         </header>
 
-        <div v-if="filteredNodes.length" class="probe-grid">
+        <div v-if="filteredNodes.length" class="probe-grid" :class="{ 'has-selection': selectedNodeIDs.length > 0 }">
           <article
             v-for="node in filteredNodes"
             :key="node.id"
@@ -388,7 +389,6 @@ function onCardDragEnd() {
               <button type="button" @click.stop="emit('edit-asset', node)"><pencil :size="12" />资产</button>
             </footer>
           </article>
-          <button v-if="!nodeSearch && nodeStatus === 'all'" type="button" class="rack-add" @click="emit('create')"><plus :size="20" /><span>添加节点</span></button>
         </div>
         <div v-else class="overview-empty">
           <server :size="28" />

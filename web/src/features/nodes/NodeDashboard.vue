@@ -120,7 +120,15 @@ const bulkActionOptions = [
   { label: "重试配置同步", value: "retry_sync" },
 ];
 const accountOptions = [{ label: "退出登录", key: "logout" }];
-const currentTime = ref("");
+const lastSyncedAt = ref<number | null>(null);
+const freshnessNow = ref(Date.now());
+const syncFreshness = computed(() => {
+  if (refreshing.value) return "正在同步";
+  if (!lastSyncedAt.value) return "尚未同步";
+  const seconds = Math.max(0, Math.floor((freshnessNow.value - lastSyncedAt.value) / 1000));
+  return seconds < 10 ? "刚刚同步" : seconds < 60 ? `${seconds} 秒前同步` : `${Math.floor(seconds / 60)} 分钟前同步`;
+});
+const syncTimestamp = computed(() => lastSyncedAt.value ? new Date(lastSyncedAt.value).toLocaleString("zh-CN", { hour12: false }) : "暂无成功同步记录");
 
 const onlineCount = computed(() => nodes.value.filter((node) => node.status === "online").length);
 const pendingCount = computed(() => nodes.value.filter((node) => node.status === "pending").length);
@@ -130,17 +138,10 @@ const assetByNode = computed(() => Object.fromEntries(nodeAssets.value.map((asse
 const pageTitle = computed(() => consolePages.find((page) => page.key === activeView.value)?.label ?? "节点详情");
 const pageGroup = computed(() => consolePages.find((page) => page.key === activeView.value)?.group ?? "监控");
 const headerStatus = computed(() => {
-  return issues.value ? `${issues.value} 台节点需关注` : "系统正常";
+  return loadError.value ? "同步失败" : !lastSyncedAt.value ? "等待数据" : issues.value ? `${issues.value} 台节点需关注` : nodes.value.length ? "系统正常" : "等待节点";
 });
 
-function updateClock() {
-  currentTime.value = new Intl.DateTimeFormat("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(new Date());
-}
+function updateFreshness() { freshnessNow.value = Date.now(); }
 
 function handleAccountAction(key: string | number) {
   if (key === "logout") emit("logout");
@@ -173,6 +174,8 @@ async function loadNodes(silent = false) {
     nodes.value = nextNodes;
     nodeAssets.value = assets;
     exitProxies.value = nextExits;
+    lastSyncedAt.value = Date.now();
+    updateFreshness();
     selectedNodeIDs.value = selectedNodeIDs.value.filter((id) => nextNodes.some((node) => node.id === id));
     if (!silent || Object.keys(nodeTrends.value).length === 0) {
       void loadNodeTrends(nodes.value);
@@ -480,15 +483,15 @@ function handleAction(action: "edit" | "enroll" | "archive", node: NodeRecord) {
 }
 
 let refreshTimer: number | undefined;
-let clockTimer: number | undefined;
+let freshnessTimer: number | undefined;
 onMounted(() => {
   syncRoute();
   window.addEventListener("hashchange", syncRoute);
   window.addEventListener("keydown", handleShortcut);
-  updateClock();
+  updateFreshness();
   loadNodes();
   loadAlerts(true);
-  clockTimer = window.setInterval(updateClock, 1_000);
+  freshnessTimer = window.setInterval(updateFreshness, 5_000);
   refreshTimer = window.setInterval(() => {
     if (document.visibilityState === "visible") {
       loadNodes(true);
@@ -500,7 +503,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("hashchange", syncRoute);
   window.removeEventListener("keydown", handleShortcut);
   window.clearInterval(refreshTimer);
-  window.clearInterval(clockTimer);
+  window.clearInterval(freshnessTimer);
 });
 </script>
 
@@ -518,9 +521,6 @@ onBeforeUnmount(() => {
         <console-navigation
           :active-view="activeView"
           :collapsed="sidebarCollapsed"
-          :online="onlineCount"
-          :total="nodes.length"
-          :issues="issues"
           @navigate="navigate"
           @collapse="sidebarCollapsed = !sidebarCollapsed"
         />
@@ -545,10 +545,10 @@ onBeforeUnmount(() => {
             <n-tooltip trigger="hover" :disabled="quickSwitcherOpen"><template #trigger>
               <n-button quaternary circle aria-label="快速跳转" @click="openQuickSwitcher"><template #icon><n-icon><search /></n-icon></template></n-button>
             </template>快速跳转 · Ctrl / ⌘ K</n-tooltip>
-            <span class="console-header__live" :class="{ 'is-warning': issues > 0 }">
+            <span class="console-header__live" :class="{ 'is-warning': issues > 0 || !!loadError }">
               <i />
               <span>{{ headerStatus }}</span>
-              <time>{{ currentTime }}</time>
+              <time tabindex="0" :datetime="lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined" :title="`最近成功同步：${syncTimestamp}`" :aria-label="`${syncFreshness}，最近成功同步：${syncTimestamp}`">{{ syncFreshness }}</time>
             </span>
             <n-tooltip trigger="hover">
               <template #trigger>
@@ -574,10 +574,6 @@ onBeforeUnmount(() => {
               </template>
               告警
             </n-tooltip>
-            <n-button v-if="activeView === 'overview'" class="console-header__create" type="primary" size="small" aria-label="添加节点" @click="openCreate">
-              <template #icon><n-icon><plus /></n-icon></template>
-              添加节点
-            </n-button>
             <n-dropdown trigger="click" :options="accountOptions" @select="handleAccountAction">
               <button class="console-header__account" type="button" aria-label="打开账户菜单">
                 <n-avatar round :size="32">{{ props.session.admin.username.slice(0, 1).toUpperCase() }}</n-avatar>
@@ -755,9 +751,6 @@ onBeforeUnmount(() => {
         <console-navigation
           mobile
           :active-view="activeView"
-          :online="onlineCount"
-          :total="nodes.length"
-          :issues="issues"
           @navigate="navigate"
         />
       </n-drawer-content>
