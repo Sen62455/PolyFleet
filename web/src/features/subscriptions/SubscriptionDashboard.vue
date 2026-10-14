@@ -50,6 +50,7 @@ const activeCount = computed(() => subscriptions.value.filter((item) => item.sta
 const attentionCount = computed(() => subscriptions.value.filter((item) => ["expiring", "exhausted", "expired"].includes(item.status)).length);
 const usedBytes = computed(() => subscriptions.value.reduce((sum, item) => sum + item.traffic_used_bytes, 0));
 const limitedBytes = computed(() => subscriptions.value.reduce((sum, item) => sum + item.traffic_limit_bytes, 0));
+const formatNames: Record<string, string> = { uri: "URI", base64: "Base64", clash: "Clash", "sing-box": "sing-box" };
 
 function handleError(error: unknown, fallback: string) {
   if (error instanceof APIError && error.status === 401) {
@@ -207,19 +208,19 @@ onMounted(() => load());
       <div v-else-if="subscriptions.length === 0" class="surface-state surface-state--empty"><key-round :size="26" /><strong>没有符合条件的订阅</strong></div>
       <div v-else class="ops-table-wrap">
         <table class="ops-table subscription-table">
-          <thead><tr><th>订阅 / 用户</th><th>状态</th><th>双向流量</th><th>有效期</th><th>最近活动</th><th>节点</th><th><span class="sr-only">操作</span></th></tr></thead>
+          <thead><tr><th>订阅 / 用户</th><th>状态</th><th>双向流量</th><th>有效期</th><th>最近活动</th><th class="num">节点</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="item in subscriptions" :key="item.token_id">
-              <td><strong>{{ item.name || "默认订阅" }}</strong><small>{{ item.display_name || item.username }} · {{ item.token_prefix }}...</small></td>
-              <td><span class="pill" :class="`pill--${statusTone(item.status)}`">{{ statusLabel(item.status) }}</span><small>{{ item.allowed_formats.join(" / ") }}</small></td>
+              <td><strong>{{ item.name || "默认订阅" }}</strong><small>{{ item.display_name || item.username }} · <code class="mono">{{ item.token_prefix }}…</code></small></td>
+              <td><span class="pill" :class="`pill--${statusTone(item.status)}`">{{ statusLabel(item.status) }}</span><span class="proto-list"><span v-for="format in item.allowed_formats" :key="format" class="proto">{{ formatNames[format] ?? format }}</span></span></td>
               <td class="subscription-table__traffic">
-                <strong>{{ formatBytes(item.traffic_used_bytes) }}</strong>
-                <small>{{ item.traffic_limit_bytes ? `/ ${formatBytes(item.traffic_limit_bytes)} · ${quotaPercent(item).toFixed(0)}%` : "不限量" }}</small>
+                <div class="traffic-line"><strong>{{ formatBytes(item.traffic_used_bytes) }}</strong>
+                <small>{{ item.traffic_limit_bytes ? `/ ${formatBytes(item.traffic_limit_bytes)} · ${quotaPercent(item).toFixed(0)}%` : "不限量" }}</small></div>
                 <i v-if="item.traffic_limit_bytes" :class="`is-${item.status === 'exhausted' ? 'critical' : severity(quotaPercent(item))}`"><span :style="{ width: `${quotaPercent(item)}%` }" /></i>
               </td>
               <td><strong>{{ expiry(item) }}</strong><small>Token / 用户取较早值</small></td>
               <td><strong>{{ relativeTime(item.last_used_at || item.last_traffic_at) }}</strong><small>{{ item.last_used_at ? "订阅已拉取" : "尚未拉取" }}</small></td>
-              <td><strong>{{ item.online_nodes }} / {{ item.assignment_count }}</strong><small>在线 / 已分配</small></td>
+              <td class="num"><strong class="node-count"><i :class="{ 'is-online': item.online_nodes > 0 }" />{{ Math.min(item.online_nodes, item.assignment_count) }} <span>/ {{ item.assignment_count }}</span></strong><small>用户在线 / 已分配</small></td>
               <td class="ops-table__actions"><n-button size="small" secondary :disabled="item.status === 'revoked'" @click="openEdit(item)">调整</n-button><n-tooltip trigger="hover"><template #trigger><n-button quaternary circle type="error" :disabled="item.status === 'revoked'" aria-label="吊销订阅" @click="revoke(item)"><template #icon><n-icon><shield-off /></n-icon></template></n-button></template>吊销</n-tooltip></td>
             </tr>
           </tbody>
@@ -256,7 +257,15 @@ onMounted(() => load());
 .subscription-table th:first-child { width: 20%; }
 .subscription-table td strong, .subscription-table td small { display: block; }
 .subscription-table td > small { margin-top: 5px; color: var(--hf-muted); font-size: 12px; }
-.subscription-table__traffic i { display: block; width: 120px; height: 4px; margin-top: 6px; overflow: hidden; border-radius: var(--hf-radius-pill); background: var(--hf-line); }
+.subscription-table__traffic i { display: block; width: 100%; min-width: 140px; height: 4px; margin-top: 6px; overflow: hidden; border-radius: var(--hf-radius-pill); background: var(--hf-line); }
+.traffic-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.traffic-line small { color: var(--hf-muted); font-size: var(--fs-xs); }
+.proto-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.proto { padding: 1px 6px; border: 1px solid var(--hf-line); border-radius: var(--hf-radius-sm); background: var(--hf-surface-muted); color: var(--hf-ink-soft); font-size: var(--fs-xs); white-space: nowrap; }
+.subscription-table td .node-count { display: inline-flex; align-items: center; gap: 6px; }
+.node-count span { color: var(--hf-muted); font-weight: 500; }
+.node-count i { width: 6px; height: 6px; border-radius: 50%; background: var(--hf-subtle); }
+.node-count i.is-online { background: var(--hf-signal); }
 .subscription-table__traffic i span { display: block; height: 100%; border-radius: inherit; background: var(--hf-accent); }
 .subscription-table__traffic i.is-warning span { background: var(--hf-pressure); }
 .subscription-table__traffic i.is-critical span { background: var(--hf-critical); }
