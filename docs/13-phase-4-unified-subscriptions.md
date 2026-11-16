@@ -50,13 +50,31 @@ Base64 的原文是以换行分隔的代理 URI。Mihomo/Clash 输出可直接�
   Clash 默认关闭统一延迟，测速包含本次网站连接握手及请求耗时；仍不等于完整网页加载时间。
 - Hysteria2 与 VLESS/TCP/Reality 均显式启用 UDP，VLESS 使用 `xudp` packet encoding；
 - fake-IP DNS、域名嗅探和默认关闭的 TUN 基线；
-- 内置私网及常用国内域名直连规则，其他流量由 `MATCH,PolyFleet` 接管。
+- 内置私网及常用国内域名直连规则，覆盖抖音视频、图片、直播、字节共享 CDN、网易资源及
+  Cloudflare 中国网络；内置规则优先于下载的规则集，其他流量由 `MATCH,PolyFleet` 接管。
 
-默认规则不引用 `GEOSITE`、`GEOIP` 或远程 rule provider，因此全新的 Mihomo 数据目录不需要
-先从 GitHub 下载规则数据库才能加载订阅。内置国内域名是可靠启动基线，不是完整的中国大陆
-分流库；未命中的域名优先走代理。需要代理系统代理无法接管的应用、QUIC、游戏或虚拟网卡
-流量时，在 Clash Verge 中开启全局 TUN。订阅文件保留 `tun.enable: false`，避免导入后在没有
-管理员权限的设备上静默改变网络栈。
+Clash/Mihomo 配置还包含两个 HTTP `rule-providers`，使用
+[MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 的中国域名和 IP MRS 集合。
+它们通过 `PolyFleet` 代理组下载，每 24 小时更新一次，缓存位于客户端的 `ruleset` 目录。
+匹配顺序为：内置直连规则 → 中国域名集合 → 中国 IP 集合 → `MATCH,PolyFleet`。
+IP 集合允许解析域名后匹配，未配置 `no-resolve`。无需下载整份 GeoSite / GeoIP 数据库。
+首次使用需要一条可用代理线路下载集合；下载失败时内置规则仍覆盖主要国内服务，完整覆盖
+需要规则集成功加载。已下载的集合使用客户端缓存。
+
+国内 DNS 策略与路由共用同一组内置域名及 `rule-set:polyfleet-cn-domain`，查询阿里与腾讯 DoH。
+`direct-nameserver` 同样使用国内 DoH，并遵守本地域名的 `nameserver-policy`；
+其他域名继续通过 `PolyFleet` 查询境外 DoH。这样国内 CDN 的路由与解析位置保持一致。
+国际版 TikTok、ChatGPT、Google、国际 Cloudflare 不加入内置国内直连规则。
+规则集和 DNS 字段参照 [Mihomo 规则集合](https://wiki.metacubex.one/config/rule-providers/)
+与 [DNS 配置](https://wiki.metacubex.one/config/dns/)。
+
+更新服务端后，已有客户端只需更新原来的 Clash/Mihomo 订阅，不需要换地址或手动维护域名。
+更新后确认客户端的“规则集”中 `polyfleet-cn-domain`、`polyfleet-cn-ip` 已加载，并重新打开
+播放页面，让旧连接退出。Clash Verge 的全局 DNS、脚本或规则覆写若已启用，会影响订阅生效，
+需检查客户端最终运行配置。仅导入节点的模式不会导入这些完整规则。
+
+需要代理系统代理无法接管的应用、QUIC、游戏或虚拟网卡流量时，可在 Clash Verge 中开启 TUN。
+此次修复不要求开启 TUN；订阅保留 `tun.enable: false`，避免导入后改变客户端接管模式。
 
 sing-box 输出顶层 `outbounds`。字段分别遵循
 [Hysteria2 URI Scheme](https://v2.hysteria.network/docs/developers/URI-Scheme/)、

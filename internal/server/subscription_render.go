@@ -19,19 +19,30 @@ type renderedSubscription struct {
 }
 
 type clashSubscription struct {
-	AllowLAN      bool              `yaml:"allow-lan"`
-	Mode          string            `yaml:"mode"`
-	LogLevel      string            `yaml:"log-level"`
-	IPv6          bool              `yaml:"ipv6"`
-	UnifiedDelay  bool              `yaml:"unified-delay"`
-	TCPConcurrent bool              `yaml:"tcp-concurrent"`
-	Profile       clashProfile      `yaml:"profile"`
-	DNS           clashDNS          `yaml:"dns"`
-	Sniffer       clashSniffer      `yaml:"sniffer"`
-	Tun           clashTun          `yaml:"tun"`
-	Proxies       []any             `yaml:"proxies"`
-	ProxyGroups   []clashProxyGroup `yaml:"proxy-groups"`
-	Rules         []string          `yaml:"rules"`
+	AllowLAN      bool                         `yaml:"allow-lan"`
+	Mode          string                       `yaml:"mode"`
+	LogLevel      string                       `yaml:"log-level"`
+	IPv6          bool                         `yaml:"ipv6"`
+	UnifiedDelay  bool                         `yaml:"unified-delay"`
+	TCPConcurrent bool                         `yaml:"tcp-concurrent"`
+	Profile       clashProfile                 `yaml:"profile"`
+	DNS           clashDNS                     `yaml:"dns"`
+	Sniffer       clashSniffer                 `yaml:"sniffer"`
+	Tun           clashTun                     `yaml:"tun"`
+	Proxies       []any                        `yaml:"proxies"`
+	ProxyGroups   []clashProxyGroup            `yaml:"proxy-groups"`
+	RuleProviders map[string]clashRuleProvider `yaml:"rule-providers"`
+	Rules         []string                     `yaml:"rules"`
+}
+
+type clashRuleProvider struct {
+	Type     string `yaml:"type"`
+	Behavior string `yaml:"behavior"`
+	Format   string `yaml:"format"`
+	URL      string `yaml:"url"`
+	Path     string `yaml:"path"`
+	Proxy    string `yaml:"proxy"`
+	Interval int    `yaml:"interval"`
 }
 
 type clashProxyGroup struct {
@@ -50,16 +61,18 @@ type clashProfile struct {
 }
 
 type clashDNS struct {
-	Enable                bool                `yaml:"enable"`
-	IPv6                  bool                `yaml:"ipv6"`
-	EnhancedMode          string              `yaml:"enhanced-mode"`
-	FakeIPRange           string              `yaml:"fake-ip-range"`
-	FakeIPFilterMode      string              `yaml:"fake-ip-filter-mode"`
-	FakeIPFilter          []string            `yaml:"fake-ip-filter"`
-	DefaultNameserver     []string            `yaml:"default-nameserver"`
-	Nameserver            []string            `yaml:"nameserver"`
-	NameserverPolicy      map[string][]string `yaml:"nameserver-policy"`
-	ProxyServerNameserver []string            `yaml:"proxy-server-nameserver"`
+	Enable                       bool                `yaml:"enable"`
+	IPv6                         bool                `yaml:"ipv6"`
+	EnhancedMode                 string              `yaml:"enhanced-mode"`
+	FakeIPRange                  string              `yaml:"fake-ip-range"`
+	FakeIPFilterMode             string              `yaml:"fake-ip-filter-mode"`
+	FakeIPFilter                 []string            `yaml:"fake-ip-filter"`
+	DefaultNameserver            []string            `yaml:"default-nameserver"`
+	Nameserver                   []string            `yaml:"nameserver"`
+	NameserverPolicy             map[string][]string `yaml:"nameserver-policy"`
+	ProxyServerNameserver        []string            `yaml:"proxy-server-nameserver"`
+	DirectNameserver             []string            `yaml:"direct-nameserver"`
+	DirectNameserverFollowPolicy bool                `yaml:"direct-nameserver-follow-policy"`
 }
 
 type clashSniffer struct {
@@ -194,10 +207,23 @@ var defaultClashDomesticDomainSuffixes = []string{
 	"baidu.com", "bdimg.com", "bilibili.com", "bilivideo.com",
 	"bytedance.com", "byteimg.com", "douyin.com", "iesdouyin.com", "amemv.com",
 	"snssdk.com", "pstatp.com", "ixigua.com",
+	// Keep video, image, live and shared CDN hosts available even before the
+	// periodically updated China provider has been downloaded. A homepage-only
+	// allowlist sends the actual media to MATCH and can stall domestic playback.
+	"douyincdn.com", "douyinpic.com", "douyinstatic.com", "douyinvod.com",
+	"douyinliving.com", "douyinact.com", "douyinfe.com",
+	"idouyinpic.com", "idouyinstatic.com", "idouyinvod.com", "idouyinliving.com",
+	"amemv.net", "iesdouyin.net", "huoshan.com", "huoshanlive.com", "huoshanvod.com",
+	"bytedance.net", "byted-static.com", "bytecdn.cn", "bytecdntp.com",
+	"bytefcdn.com", "bytegoofy.com", "byteimgc.com", "bytelb.com", "bytetos.com",
+	"toutiaocdn.com", "toutiaoimg.com", "toutiaostatic.com", "toutiaovod.com",
+	"ixiguavideo.com", "volces.com",
 	"hicloud.com", "huawei.com", "jd.com",
 	"360buyimg.com", "iqiyi.com", "xiaohongshu.com",
 	"meituan.com", "dianping.com", "mi.com", "miui.com", "xiaomi.com",
 	"netease.com", "qq.com", "qpic.cn", "gtimg.com", "tencent.com",
+	"126.net", "127.net", "163yun.com", "netease.im", "ydstatic.com", "youdao.com",
+	"cloudflare-cn.com",
 	"tenpay.com", "weixin.qq.com", "wechat.com", "taobao.com", "tmall.com", "toutiao.com",
 	"youku.com", "ykimg.com", "zhihu.com", "zhimg.com",
 }
@@ -222,7 +248,29 @@ func defaultClashRules() []string {
 	for _, suffix := range defaultClashDomesticDomainSuffixes {
 		rules = append(rules, "DOMAIN-SUFFIX,"+suffix+",DIRECT")
 	}
-	return append(rules, "MATCH,PolyFleet")
+	return append(rules,
+		"RULE-SET,polyfleet-cn-domain,DIRECT",
+		// Resolve unclassified domains before the IP fallback. no-resolve here
+		// would miss domestic destinations reached with a hostname or fake IP.
+		"RULE-SET,polyfleet-cn-ip,DIRECT",
+		"MATCH,PolyFleet",
+	)
+}
+
+func defaultClashRuleProviders() map[string]clashRuleProvider {
+	const baseURL = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/"
+	return map[string]clashRuleProvider{
+		"polyfleet-cn-domain": {
+			Type: "http", Behavior: "domain", Format: "mrs",
+			URL: baseURL + "geosite/cn.mrs", Path: "./ruleset/polyfleet-cn-domain.mrs",
+			Proxy: "PolyFleet", Interval: 86400,
+		},
+		"polyfleet-cn-ip": {
+			Type: "http", Behavior: "ipcidr", Format: "mrs",
+			URL: baseURL + "geoip/cn.mrs", Path: "./ruleset/polyfleet-cn-ip.mrs",
+			Proxy: "PolyFleet", Interval: 86400,
+		},
+	}
 }
 
 func defaultClashDNS() clashDNS {
@@ -238,6 +286,9 @@ func defaultClashDNS() clashDNS {
 	for _, suffix := range defaultClashDomesticDomainSuffixes {
 		nameserverPolicy["+."+suffix] = domesticNameservers
 	}
+	// DNS and routing must use the same domestic classification. In particular,
+	// a direct CDN connection should not inherit a foreign resolver's location.
+	nameserverPolicy["rule-set:polyfleet-cn-domain"] = domesticNameservers
 
 	return clashDNS{
 		Enable: true, IPv6: false, EnhancedMode: "fake-ip",
@@ -251,8 +302,10 @@ func defaultClashDNS() clashDNS {
 			"https://1.1.1.1/dns-query#PolyFleet",
 			"https://8.8.8.8/dns-query#PolyFleet",
 		},
-		NameserverPolicy:      nameserverPolicy,
-		ProxyServerNameserver: domesticNameservers,
+		NameserverPolicy:             nameserverPolicy,
+		ProxyServerNameserver:        domesticNameservers,
+		DirectNameserver:             domesticNameservers,
+		DirectNameserverFollowPolicy: true,
 	}
 }
 
@@ -360,6 +413,7 @@ func renderSubscription(format string, subscription store.Subscription) (rendere
 			Profile: clashProfile{StoreSelected: true, StoreFakeIP: true},
 			DNS:     defaultClashDNS(), Sniffer: defaultClashSniffer(), Tun: defaultClashTun(),
 			Proxies: proxies, ProxyGroups: proxyGroups, Rules: defaultClashRules(),
+			RuleProviders: defaultClashRuleProviders(),
 		})
 		if err != nil {
 			return renderedSubscription{}, fmt.Errorf("encode Clash subscription: %w", err)

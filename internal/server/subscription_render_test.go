@@ -127,7 +127,6 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		t.Fatalf("unexpected Clash subscription: %#v", clashValue)
 	}
 	rules := strings.Join(clashValue.Rules, "\n")
-	clashDocument := strings.ToUpper(string(clash.Body))
 	if clashValue.Mode != "rule" || clashValue.IPv6 || !clashValue.TCPConcurrent ||
 		!clashValue.DNS.Enable || clashValue.DNS.EnhancedMode != "fake-ip" || len(clashValue.DNS.Nameserver) != 2 ||
 		!strings.HasSuffix(clashValue.DNS.Nameserver[0], "#PolyFleet") ||
@@ -146,8 +145,8 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		len(clashValue.Rules) < 3 || clashValue.Rules[0] != "DOMAIN,localhost,DIRECT" ||
 		!strings.Contains(rules, "DOMAIN-SUFFIX,cn,DIRECT") ||
 		!strings.Contains(rules, "DOMAIN-SUFFIX,qq.com,DIRECT") ||
-		strings.Contains(clashDocument, "GEOSITE") || strings.Contains(clashDocument, "GEOIP") ||
-		strings.Contains(clashDocument, "FALLBACK:") ||
+		strings.Contains(rules, "GEOSITE,") || strings.Contains(rules, "GEOIP,") ||
+		strings.Contains(string(clash.Body), "fallback:") ||
 		strings.Contains(rules, "198.18.0.0/16") ||
 		clashValue.Rules[len(clashValue.Rules)-1] != "MATCH,PolyFleet" {
 		t.Fatalf("Clash rule-mode configuration is incomplete: %#v", clashValue)
@@ -179,6 +178,59 @@ func TestSubscriptionRenderersEscapeStructuredValues(t *testing.T) {
 		len(singBoxValue.Outbounds[0].TLS.CertificatePublicKeySHA256) != 1 ||
 		singBoxValue.Outbounds[0].TLS.CertificatePublicKeySHA256[0] != publicKeyPin {
 		t.Fatalf("unexpected sing-box subscription: %#v", singBoxValue)
+	}
+}
+
+func TestClashDomesticRoutingCoversMediaAndKeepsDNSAligned(t *testing.T) {
+	rendered, err := renderSubscription("clash", store.Subscription{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config clashSubscription
+	if err := yaml.Unmarshal(rendered.Body, &config); err != nil {
+		t.Fatal(err)
+	}
+	ruleIndex := make(map[string]int)
+	for i, rule := range config.Rules {
+		ruleIndex[rule] = i
+	}
+	for _, suffix := range []string{
+		"douyinvod.com", "douyincdn.com", "douyinpic.com", "douyinstatic.com",
+		"douyinliving.com", "idouyinvod.com", "idouyinliving.com",
+		"bytegoofy.com", "bytedance.net", "volces.com",
+		"126.net", "127.net", "cloudflare-cn.com",
+	} {
+		index, ok := ruleIndex["DOMAIN-SUFFIX,"+suffix+",DIRECT"]
+		if !ok || index >= ruleIndex["RULE-SET,polyfleet-cn-domain,DIRECT"] {
+			t.Errorf("%s must have an offline direct rule before downloaded providers", suffix)
+		}
+		if got := config.DNS.NameserverPolicy["+."+suffix]; strings.Join(got, ",") != strings.Join(config.DNS.DirectNameserver, ",") {
+			t.Errorf("%s DNS must use the domestic direct resolvers", suffix)
+		}
+	}
+	for _, suffix := range []string{"tiktok.com", "tiktokcdn.com", "byteoversea.com", "cloudflare.com", "chatgpt.com"} {
+		if _, ok := ruleIndex["DOMAIN-SUFFIX,"+suffix+",DIRECT"]; ok {
+			t.Errorf("international service %s must not be in the domestic fallback", suffix)
+		}
+	}
+	if len(config.RuleProviders) != 2 || len(config.DNS.DirectNameserver) != 2 || !config.DNS.DirectNameserverFollowPolicy {
+		t.Fatal("missing China rule providers or direct DNS policy")
+	}
+	for name, behavior := range map[string]string{"polyfleet-cn-domain": "domain", "polyfleet-cn-ip": "ipcidr"} {
+		provider, ok := config.RuleProviders[name]
+		parsed, err := url.Parse(provider.URL)
+		if !ok || err != nil || parsed.Scheme != "https" || parsed.Host != "raw.githubusercontent.com" ||
+			provider.Type != "http" || provider.Behavior != behavior || provider.Format != "mrs" ||
+			provider.Proxy != "PolyFleet" || provider.Interval != 86400 || provider.Path == "" {
+			t.Errorf("invalid updateable %s provider: %#v", name, provider)
+		}
+	}
+	if strings.Join(config.DNS.NameserverPolicy["rule-set:polyfleet-cn-domain"], ",") != strings.Join(config.DNS.DirectNameserver, ",") {
+		t.Fatal("downloaded domestic domains must use the same DNS as offline domains")
+	}
+	end := config.Rules[len(config.Rules)-3:]
+	if strings.Join(end, "\n") != "RULE-SET,polyfleet-cn-domain,DIRECT\nRULE-SET,polyfleet-cn-ip,DIRECT\nMATCH,PolyFleet" {
+		t.Fatalf("invalid domain/IP/final rule ordering: %v", end)
 	}
 }
 
